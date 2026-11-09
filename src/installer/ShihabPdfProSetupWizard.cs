@@ -23,10 +23,78 @@ namespace ShihabMehediPdfProInstaller
         [STAThread]
         public static int Main(string[] shihabArgs)
         {
+            string mehediDefaultDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Programs",
+                "PDF PRO");
+
+            if (shihabArgs != null && shihabArgs.Length > 0)
+            {
+                bool sshihabb007Silent = false;
+                string shihabCustomDir = mehediDefaultDir;
+                foreach (string mehediArg in shihabArgs)
+                {
+                    if (string.IsNullOrWhiteSpace(mehediArg)) continue;
+                    if (string.Equals(mehediArg, "--silent", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(mehediArg, "/S", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(mehediArg, "/silent", StringComparison.OrdinalIgnoreCase))
+                    {
+                        sshihabb007Silent = true;
+                    }
+                    else if (mehediArg.StartsWith("--dir=", StringComparison.OrdinalIgnoreCase))
+                    {
+                        shihabCustomDir = mehediArg.Substring("--dir=".Length).Trim('"');
+                    }
+                }
+
+                if (sshihabb007Silent)
+                {
+                    try
+                    {
+                        ExtractShihabPayloadToDirectory(shihabCustomDir);
+                        return 0;
+                    }
+                    catch (Exception shihabEx)
+                    {
+                        Console.Error.WriteLine("PDF PRO Silent Setup Error: " + shihabEx.Message);
+                        return 1;
+                    }
+                }
+            }
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new ShihabPdfProSetupWizard());
             return 0;
+        }
+
+        public static void ExtractShihabPayloadToDirectory(string sshihabb007TargetDir)
+        {
+            Directory.CreateDirectory(sshihabb007TargetDir);
+            Assembly shihabAsm = Assembly.GetExecutingAssembly();
+            using (Stream mehediPayloadStream = shihabAsm.GetManifestResourceStream("ShihabMehediPdfProInstaller.payload.zip"))
+            {
+                if (mehediPayloadStream == null)
+                {
+                    throw new InvalidOperationException("Embedded payload.zip resource not found.");
+                }
+                using (ZipArchive sshihabb007Zip = new ZipArchive(mehediPayloadStream, ZipArchiveMode.Read))
+                {
+                    foreach (ZipArchiveEntry shihabEntry in sshihabb007Zip.Entries)
+                    {
+                        string mehediDestPath = Path.Combine(sshihabb007TargetDir, shihabEntry.FullName.Replace('/', Path.DirectorySeparatorChar));
+                        string sshihabb007Parent = Path.GetDirectoryName(mehediDestPath);
+                        if (!string.IsNullOrEmpty(sshihabb007Parent))
+                        {
+                            Directory.CreateDirectory(sshihabb007Parent);
+                        }
+                        if (!string.IsNullOrEmpty(shihabEntry.Name))
+                        {
+                            shihabEntry.ExtractToFile(mehediDestPath, true);
+                        }
+                    }
+                }
+            }
         }
 
         public ShihabPdfProSetupWizard()
@@ -128,32 +196,7 @@ namespace ShihabMehediPdfProInstaller
             try
             {
                 string sshihabb007TargetDir = shihabTargetDirBox.Text.Trim();
-                Directory.CreateDirectory(sshihabb007TargetDir);
-
-                Assembly shihabAsm = Assembly.GetExecutingAssembly();
-                using (Stream mehediPayloadStream = shihabAsm.GetManifestResourceStream("ShihabMehediPdfProInstaller.payload.zip"))
-                {
-                    if (mehediPayloadStream == null)
-                    {
-                        throw new InvalidOperationException("Embedded payload.zip resource not found.");
-                    }
-                    using (ZipArchive sshihabb007Zip = new ZipArchive(mehediPayloadStream, ZipArchiveMode.Read))
-                    {
-                        foreach (ZipArchiveEntry shihabEntry in sshihabb007Zip.Entries)
-                        {
-                            string mehediDestPath = Path.Combine(sshihabb007TargetDir, shihabEntry.FullName.Replace('/', Path.DirectorySeparatorChar));
-                            string sshihabb007Parent = Path.GetDirectoryName(mehediDestPath);
-                            if (!string.IsNullOrEmpty(sshihabb007Parent))
-                            {
-                                Directory.CreateDirectory(sshihabb007Parent);
-                            }
-                            if (!string.IsNullOrEmpty(shihabEntry.Name))
-                            {
-                                shihabEntry.ExtractToFile(mehediDestPath, true);
-                            }
-                        }
-                    }
-                }
+                ExtractShihabPayloadToDirectory(sshihabb007TargetDir);
 
                 sshihabb007StatusLabel.Text = "✔ Installed PDF PRO v14.0.4 to: " + sshihabb007TargetDir;
                 string shihabInstalledExe = Path.Combine(sshihabb007TargetDir, "pdfpro.exe");

@@ -15,6 +15,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: pdfpro-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   shihab-build-and-release:
     name: Build x64 Portable EXE & Setup Installer (Windows)

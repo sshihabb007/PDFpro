@@ -146,6 +146,25 @@ namespace ShihabMehediPdfPro
             int shihabSelectedAnnotationIdx,
             int mehediSelectedTextBlockIdx)
         {
+            return RenderShihabCompositePage(
+                shihabDoc,
+                mehediPageIdx,
+                sshihabb007ZoomScale,
+                shihabSelectedAnnotationIdx,
+                mehediSelectedTextBlockIdx,
+                false,
+                null);
+        }
+
+        public static Bitmap RenderShihabCompositePage(
+            ShihabPdfDocumentModel shihabDoc,
+            int mehediPageIdx,
+            float sshihabb007ZoomScale,
+            int shihabSelectedAnnotationIdx,
+            int mehediSelectedTextBlockIdx,
+            bool shihabShowAllEditableFrames,
+            HashSet<int> mehediMultiSelectedTextIndices)
+        {
             if (shihabDoc == null || mehediPageIdx < 0 || mehediPageIdx >= shihabDoc.Sshihabb007Pages.Count)
             {
                 return new Bitmap(600, 840);
@@ -160,6 +179,11 @@ namespace ShihabMehediPdfPro
             int mehediTargetPixelH = Math.Max(120, Math.Min(4200, (int)Math.Round(sshihabb007LogicalH * sshihabb007ZoomScale)));
 
             Bitmap sshihabb007BaseBitmap = GetOrRenderMehediBasePageBitmap(shihabDoc, sshihabb007Page, shihabTargetPixelW, mehediTargetPixelH);
+            if (sshihabb007BaseBitmap != null && !sshihabb007Page.ShihabHasOcrLayerApplied)
+            {
+                EnsureShihabPageRealTextBlocksIndexed( sshihabb007Page, sshihabb007BaseBitmap, sshihabb007ZoomScale);
+            }
+
             Bitmap shihabFinalCanvas = new Bitmap(shihabTargetPixelW, mehediTargetPixelH, PixelFormat.Format32bppPArgb);
 
             using (Graphics mehediG = Graphics.FromImage(shihabFinalCanvas))
@@ -188,10 +212,160 @@ namespace ShihabMehediPdfPro
                     sshihabb007ZoomScale,
                     shihabSelectedAnnotationIdx,
                     mehediSelectedTextBlockIdx,
-                    sshihabb007BaseBitmap != null);
+                    sshihabb007BaseBitmap != null,
+                    shihabShowAllEditableFrames,
+                    mehediMultiSelectedTextIndices);
             }
 
             return shihabFinalCanvas;
+        }
+
+        public static void EnsureShihabPageRealTextBlocksIndexed(
+            MehediPdfPageModel shihabPage,
+            Bitmap mehediBaseBitmap,
+            float sshihabb007BitmapScale)
+        {
+            if (shihabPage == null || shihabPage.ShihabHasOcrLayerApplied || mehediBaseBitmap == null) return;
+            shihabPage.ShihabHasOcrLayerApplied = true;
+
+            try
+            {
+                List<ShihabPdfTextBlockItem> sshihabb007DetectedBlocks;
+                int shihabWordCount;
+                string mehediText = RunShihabNeuralOcrOnBitmap(
+                    mehediBaseBitmap,
+                    shihabPage.ShihabPageIndex,
+                    Math.Max(0.25f, sshihabb007BitmapScale),
+                    out sshihabb007DetectedBlocks,
+                    out shihabWordCount);
+
+                if (sshihabb007DetectedBlocks != null && sshihabb007DetectedBlocks.Count > 0)
+                {
+                    foreach (ShihabPdfTextBlockItem shihabBlk in sshihabb007DetectedBlocks)
+                    {
+                        shihabBlk.MehediOriginalBoundsPt = shihabBlk.Sshihabb007BoundsPt;
+                        Color mehediBgCol;
+                        Color sshihabb007FgCol;
+                        SampleShihabTextAndBgColorsFromBitmap(
+                            mehediBaseBitmap,
+                            shihabBlk.Sshihabb007BoundsPt,
+                            sshihabb007BitmapScale,
+                            out mehediBgCol,
+                            out sshihabb007FgCol);
+                        shihabBlk.Sshihabb007BackgroundMaskColor = mehediBgCol;
+                        shihabBlk.MehediTextColor = sshihabb007FgCol;
+                        if (shihabBlk.ShihabFontSizePt >= 13.0f)
+                        {
+                            shihabBlk.Sshihabb007IsBold = true;
+                        }
+                    }
+
+                    // Preserve any user-modified blocks if already added
+                    List<ShihabPdfTextBlockItem> mehediMerged = new List<ShihabPdfTextBlockItem>();
+                    if (shihabPage.ShihabTextBlocks != null)
+                    {
+                        foreach (ShihabPdfTextBlockItem sshihabb007Existing in shihabPage.ShihabTextBlocks)
+                        {
+                            if (sshihabb007Existing.MehediIsModified)
+                            {
+                                mehediMerged.Add(sshihabb007Existing);
+                            }
+                        }
+                    }
+                    mehediMerged.AddRange(sshihabb007DetectedBlocks);
+                    shihabPage.ShihabTextBlocks = mehediMerged;
+                    if (!string.IsNullOrWhiteSpace(mehediText))
+                    {
+                        shihabPage.ShihabExtractedText = mehediText;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private static void SampleShihabTextAndBgColorsFromBitmap(
+            Bitmap shihabBmp,
+            RectangleF mehediRectPt,
+            float sshihabb007Scale,
+            out Color shihabBgColor,
+            out Color mehediFgColor)
+        {
+            shihabBgColor = Color.White;
+            mehediFgColor = Color.FromArgb(255, 22, 26, 36);
+            if (shihabBmp == null) return;
+
+            try
+            {
+                int shihabX0 = Math.Max(0, Math.Min(shihabBmp.Width - 1, (int)(mehediRectPt.Left * sshihabb007Scale)));
+                int mehediY0 = Math.Max(0, Math.Min(shihabBmp.Height - 1, (int)(mehediRectPt.Top * sshihabb007Scale)));
+                int sshihabb007X1 = Math.Max(0, Math.Min(shihabBmp.Width - 1, (int)(mehediRectPt.Right * sshihabb007Scale)));
+                int shihabY1 = Math.Max(0, Math.Min(shihabBmp.Height - 1, (int)(mehediRectPt.Bottom * sshihabb007Scale)));
+
+                // Sample corners/edges slightly outside or on the perimeter for background color
+                int mehediPadTopY = Math.Max(0, mehediY0 - 2);
+                int sshihabb007MidX = (shihabX0 + sshihabb007X1) / 2;
+                Color c1 = shihabBmp.GetPixel(shihabX0, mehediPadTopY);
+                Color c2 = shihabBmp.GetPixel(sshihabb007MidX, mehediPadTopY);
+                Color c3 = shihabBmp.GetPixel(sshihabb007X1, mehediPadTopY);
+                shihabBgColor = Color.FromArgb(
+                    255,
+                    (c1.R + c2.R + c3.R) / 3,
+                    (c1.G + c2.G + c3.G) / 3,
+                    (c1.B + c2.B + c3.B) / 3);
+
+                // Sample across the horizontal midline for the highest-contrast ink pixel
+                int mehediMidY = (mehediY0 + shihabY1) / 2;
+                int sshihabb007BestDist = -1;
+                int shihabStep = Math.Max(1, (sshihabb007X1 - shihabX0) / 24);
+                for (int mehediX = shihabX0; mehediX <= sshihabb007X1; mehediX += shihabStep)
+                {
+                    Color sshihabb007Px = shihabBmp.GetPixel(mehediX, mehediMidY);
+                    int shihabDist = Math.Abs(sshihabb007Px.R - shihabBgColor.R)
+                                   + Math.Abs(sshihabb007Px.G - shihabBgColor.G)
+                                   + Math.Abs(sshihabb007Px.B - shihabBgColor.B);
+                    if (shihabDist > sshihabb007BestDist && shihabDist > 90)
+                    {
+                        sshihabb007BestDist = shihabDist;
+                        mehediFgColor = Color.FromArgb(255, sshihabb007Px.R, sshihabb007Px.G, sshihabb007Px.B);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public static byte[] CropShihabPageRegionToPngBytes(
+            ShihabPdfDocumentModel shihabDoc,
+            int mehediPageIdx,
+            RectangleF sshihabb007RegionPt)
+        {
+            if (shihabDoc == null || mehediPageIdx < 0 || mehediPageIdx >= shihabDoc.Sshihabb007Pages.Count)
+                return null;
+
+            MehediPdfPageModel shihabPage = shihabDoc.Sshihabb007Pages[mehediPageIdx];
+            float mehediScale = 2.0f;
+            int sshihabb007FullW = Math.Max(120, (int)Math.Round(shihabPage.MehediWidthPt * mehediScale));
+            int shihabFullH = Math.Max(160, (int)Math.Round(shihabPage.Sshihabb007HeightPt * mehediScale));
+
+            Bitmap mehediBase = GetOrRenderMehediBasePageBitmap(shihabDoc, shihabPage, sshihabb007FullW, shihabFullH);
+            if (mehediBase == null) return null;
+
+            int sshihabb007CropX = Math.Max(0, Math.Min(mehediBase.Width - 8, (int)Math.Round(sshihabb007RegionPt.X * mehediScale)));
+            int shihabCropY = Math.Max(0, Math.Min(mehediBase.Height - 8, (int)Math.Round(sshihabb007RegionPt.Y * mehediScale)));
+            int mehediCropW = Math.Max(8, Math.Min(mehediBase.Width - sshihabb007CropX, (int)Math.Round(sshihabb007RegionPt.Width * mehediScale)));
+            int sshihabb007CropH = Math.Max(8, Math.Min(mehediBase.Height - shihabCropY, (int)Math.Round(sshihabb007RegionPt.Height * mehediScale)));
+
+            using (Bitmap shihabSubBmp = new Bitmap(mehediCropW, sshihabb007CropH, PixelFormat.Format32bppPArgb))
+            using (Graphics mehediG = Graphics.FromImage(shihabSubBmp))
+            using (MemoryStream sshihabb007Ms = new MemoryStream())
+            {
+                mehediG.DrawImage(
+                    mehediBase,
+                    new Rectangle(0, 0, mehediCropW, sshihabb007CropH),
+                    new Rectangle(sshihabb007CropX, shihabCropY, mehediCropW, sshihabb007CropH),
+                    GraphicsUnit.Pixel);
+                shihabSubBmp.Save(sshihabb007Ms, ImageFormat.Png);
+                return sshihabb007Ms.ToArray();
+            }
         }
 
         private static Bitmap GetOrRenderMehediBasePageBitmap(
@@ -200,21 +374,7 @@ namespace ShihabMehediPdfPro
             int sshihabb007PixelW,
             int shihabPixelH)
         {
-            bool sshihabb007HasInPlaceModifiedText = false;
-            if (mehediPage.ShihabTextBlocks != null)
-            {
-                foreach (ShihabPdfTextBlockItem shihabTb in mehediPage.ShihabTextBlocks)
-                {
-                    if (shihabTb.MehediIsModified)
-                    {
-                        sshihabb007HasInPlaceModifiedText = true;
-                        break;
-                    }
-                }
-            }
-
-            if (sshihabb007HasInPlaceModifiedText ||
-                mehediPage.MehediSourcePdfPageIndex < 0 ||
+            if (mehediPage.MehediSourcePdfPageIndex < 0 ||
                 shihabDoc.MehediOriginalFileBytes == null ||
                 shihabDoc.MehediOriginalFileBytes.Length < 16)
             {
@@ -374,22 +534,120 @@ namespace ShihabMehediPdfPro
             float shihabScale,
             int mehediSelectedAnnotIdx,
             int sshihabb007SelectedBlockIdx,
-            bool shihabUsedWinRtBase)
+            bool shihabUsedWinRtBase,
+            bool shihabShowAllEditableFrames,
+            HashSet<int> mehediMultiSelectedTextIndices)
         {
-            if (shihabUsedWinRtBase && sshihabb007Page.ShihabTextBlocks != null)
+            // 1. Mask out original source cutout regions for moved/deleted Edit-Object cutouts
+            if (sshihabb007Page.MehediAnnotations != null)
             {
+                foreach (ShihabPdfAnnotationItem shihabCutoutAnnot in sshihabb007Page.MehediAnnotations)
+                {
+                    if (!shihabCutoutAnnot.MehediSourceCutoutBoundsPt.IsEmpty)
+                    {
+                        RectangleF mehediMaskRect = ScaleShihabRect(shihabCutoutAnnot.MehediSourceCutoutBoundsPt, shihabScale);
+                        using (SolidBrush sshihabb007MaskBrush = new SolidBrush(sshihabb007Page.Sshihabb007PaperBackgroundColor))
+                        {
+                            shihabG.FillRectangle(sshihabb007MaskBrush, mehediMaskRect.X - 1, mehediMaskRect.Y - 1, mehediMaskRect.Width + 2, mehediMaskRect.Height + 2);
+                        }
+                    }
+                }
+            }
+
+            // 2. Render in-place modified/moved/deleted text blocks + text selection & editable frames
+            if (sshihabb007Page.ShihabTextBlocks != null)
+            {
+                // Pass A: Mask original bounds of any modified or deleted text blocks on top of WinRT base bitmap
+                if (shihabUsedWinRtBase)
+                {
+                    for (int mehediIdx = 0; mehediIdx < sshihabb007Page.ShihabTextBlocks.Count; mehediIdx++)
+                    {
+                        ShihabPdfTextBlockItem sshihabb007Block = sshihabb007Page.ShihabTextBlocks[mehediIdx];
+                        if (sshihabb007Block.MehediIsModified || sshihabb007Block.ShihabIsDeleted)
+                        {
+                            RectangleF shihabOrigPt = sshihabb007Block.MehediOriginalBoundsPt.IsEmpty
+                                ? sshihabb007Block.Sshihabb007BoundsPt
+                                : sshihabb007Block.MehediOriginalBoundsPt;
+                            if (!shihabOrigPt.IsEmpty && shihabOrigPt.Width > 1f && shihabOrigPt.Height > 1f)
+                            {
+                                RectangleF mehediOrigPx = ScaleShihabRect(shihabOrigPt, shihabScale);
+                                Color sshihabb007MaskCol = sshihabb007Block.Sshihabb007BackgroundMaskColor.IsEmpty
+                                    ? Color.White
+                                    : sshihabb007Block.Sshihabb007BackgroundMaskColor;
+                                using (SolidBrush shihabEraseBrush = new SolidBrush(sshihabb007MaskCol))
+                                {
+                                    shihabG.FillRectangle(shihabEraseBrush, mehediOrigPx.X - 2, mehediOrigPx.Y - 1, mehediOrigPx.Width + 4, mehediOrigPx.Height + 2);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Pass B: Draw modified text blocks, multi-text selection highlights, and Edit Text bounding frames
                 for (int mehediIdx = 0; mehediIdx < sshihabb007Page.ShihabTextBlocks.Count; mehediIdx++)
                 {
                     ShihabPdfTextBlockItem sshihabb007Block = sshihabb007Page.ShihabTextBlocks[mehediIdx];
+                    if (sshihabb007Block.ShihabIsDeleted) continue;
+
+                    RectangleF shihabRect = ScaleShihabRect(sshihabb007Block.Sshihabb007BoundsPt, shihabScale);
+
+                    if (shihabUsedWinRtBase && sshihabb007Block.MehediIsModified && !string.IsNullOrEmpty(sshihabb007Block.ShihabText))
+                    {
+                        // Paint background behind new position if moved
+                        if (sshihabb007Block.Sshihabb007BoundsPt != sshihabb007Block.MehediOriginalBoundsPt && !sshihabb007Block.MehediOriginalBoundsPt.IsEmpty)
+                        {
+                            Color mehediNewBg = sshihabb007Block.Sshihabb007BackgroundMaskColor.IsEmpty ? Color.White : sshihabb007Block.Sshihabb007BackgroundMaskColor;
+                            using (SolidBrush sshihabb007BgBr = new SolidBrush(Color.FromArgb(235, mehediNewBg.R, mehediNewBg.G, mehediNewBg.B)))
+                            {
+                                shihabG.FillRectangle(sshihabb007BgBr, shihabRect.X - 2, shihabRect.Y - 1, shihabRect.Width + 4, shihabRect.Height + 2);
+                            }
+                        }
+
+                        FontStyle mehediStyle = FontStyle.Regular;
+                        if (sshihabb007Block.Sshihabb007IsBold) mehediStyle |= FontStyle.Bold;
+                        if (sshihabb007Block.ShihabIsItalic) mehediStyle |= FontStyle.Italic;
+
+                        string sshihabb007FontFam = string.IsNullOrWhiteSpace(sshihabb007Block.Sshihabb007FontName) || sshihabb007Block.Sshihabb007FontName == "Helvetica"
+                            ? "Segoe UI"
+                            : sshihabb007Block.Sshihabb007FontName;
+
+                        using (Font shihabFont = new Font(sshihabb007FontFam, Math.Max(6.5f, sshihabb007Block.ShihabFontSizePt * shihabScale * 0.85f), mehediStyle))
+                        using (SolidBrush mehediFgBrush = new SolidBrush(sshihabb007Block.MehediTextColor))
+                        {
+                            shihabG.DrawString(sshihabb007Block.ShihabText, shihabFont, mehediFgBrush, new PointF(shihabRect.X, shihabRect.Y));
+                        }
+                    }
+
+                    // Highlight when selected with the "Select" (Mark Text) tool
+                    if (mehediMultiSelectedTextIndices != null && mehediMultiSelectedTextIndices.Contains(mehediIdx))
+                    {
+                        using (SolidBrush sshihabb007SelBrush = new SolidBrush(Color.FromArgb(82, 0, 120, 215)))
+                        using (Pen shihabSelBorder = new Pen(Color.FromArgb(190, 0, 120, 215), 1.0f))
+                        {
+                            shihabG.FillRectangle(sshihabb007SelBrush, shihabRect);
+                            shihabG.DrawRectangle(shihabSelBorder, shihabRect.X, shihabRect.Y, shihabRect.Width, shihabRect.Height);
+                        }
+                    }
+
+                    // Show subtle dashed editable frame around every text block in Edit Text / Edit Object mode
+                    if (shihabShowAllEditableFrames && mehediIdx != sshihabb007SelectedBlockIdx)
+                    {
+                        using (Pen mehediEditFramePen = new Pen(Color.FromArgb(110, 132, 34, 166), 1.0f) { DashStyle = DashStyle.Dot })
+                        {
+                            shihabG.DrawRectangle(mehediEditFramePen, shihabRect.X - 1, shihabRect.Y - 1, shihabRect.Width + 2, shihabRect.Height + 2);
+                        }
+                    }
+
+                    // Draw active selection frame + 8 resize handles for the selected text block
                     if (mehediIdx == sshihabb007SelectedBlockIdx)
                     {
-                        RectangleF shihabRect = ScaleShihabRect(sshihabb007Block.Sshihabb007BoundsPt, shihabScale);
-                        using (SolidBrush mehediTint = new SolidBrush(Color.FromArgb(28, 132, 34, 166)))
-                        using (Pen sshihabb007Pen = new Pen(Color.FromArgb(210, 132, 34, 166), 1.5f) { DashStyle = DashStyle.Dash })
+                        using (SolidBrush mehediTint = new SolidBrush(Color.FromArgb(26, 132, 34, 166)))
+                        using (Pen sshihabb007Pen = new Pen(Color.FromArgb(245, 132, 34, 166), 1.6f) { DashStyle = DashStyle.Dash })
                         {
                             shihabG.FillRectangle(mehediTint, shihabRect);
-                            shihabG.DrawRectangle(sshihabb007Pen, shihabRect.X, shihabRect.Y, shihabRect.Width, shihabRect.Height);
+                            shihabG.DrawRectangle(sshihabb007Pen, shihabRect.X - 2, shihabRect.Y - 2, shihabRect.Width + 4, shihabRect.Height + 4);
                         }
+                        DrawShihabEightResizeHandles(shihabG, new RectangleF(shihabRect.X - 2, shihabRect.Y - 2, shihabRect.Width + 4, shihabRect.Height + 4));
                     }
                 }
             }
@@ -533,10 +791,12 @@ namespace ShihabMehediPdfPro
 
                     if (shihabIdx == mehediSelectedAnnotIdx)
                     {
-                        using (Pen shihabSelPen = new Pen(Color.FromArgb(255, 132, 34, 166), 2.0f) { DashStyle = DashStyle.Dot })
+                        RectangleF mehediSelFrame = new RectangleF(sshihabb007Rect.X - 3, sshihabb007Rect.Y - 3, sshihabb007Rect.Width + 6, sshihabb007Rect.Height + 6);
+                        using (Pen shihabSelPen = new Pen(Color.FromArgb(255, 132, 34, 166), 1.8f) { DashStyle = DashStyle.Dash })
                         {
-                            shihabG.DrawRectangle(shihabSelPen, sshihabb007Rect.X - 3, sshihabb007Rect.Y - 3, sshihabb007Rect.Width + 6, sshihabb007Rect.Height + 6);
+                            shihabG.DrawRectangle(shihabSelPen, mehediSelFrame.X, mehediSelFrame.Y, mehediSelFrame.Width, mehediSelFrame.Height);
                         }
+                        DrawShihabEightResizeHandles(shihabG, mehediSelFrame);
                     }
                 }
             }
@@ -580,6 +840,36 @@ namespace ShihabMehediPdfPro
                         shihabG.DrawString("Reason: " + sshihabb007Sig.ShihabSignatureReason, mehediSubFont, Brushes.DarkSlateGray, shihabSigRect.X + 6, shihabSigRect.Y + (22f * shihabScale));
                         shihabG.DrawString("UTC: " + sshihabb007Sig.Sshihabb007SignTimestampUtc.ToString("yyyy-MM-dd HH:mm:ss") + " | Cert: " + sshihabb007Sig.ShihabCertificateThumbprint.Substring(0, 12), mehediSubFont, Brushes.DimGray, shihabSigRect.X + 6, shihabSigRect.Y + (38f * shihabScale));
                     }
+                }
+            }
+        }
+
+        private static void DrawShihabEightResizeHandles(Graphics shihabG, RectangleF mehediBoxPx)
+        {
+            float sshihabb007Hs = 6.0f;
+            float shihabMidX = mehediBoxPx.Left + (mehediBoxPx.Width * 0.5f);
+            float mehediMidY = mehediBoxPx.Top + (mehediBoxPx.Height * 0.5f);
+
+            PointF[] sshihabb007Centers = new PointF[]
+            {
+                new PointF(mehediBoxPx.Left, mehediBoxPx.Top),
+                new PointF(shihabMidX, mehediBoxPx.Top),
+                new PointF(mehediBoxPx.Right, mehediBoxPx.Top),
+                new PointF(mehediBoxPx.Right, mehediMidY),
+                new PointF(mehediBoxPx.Right, mehediBoxPx.Bottom),
+                new PointF(shihabMidX, mehediBoxPx.Bottom),
+                new PointF(mehediBoxPx.Left, mehediBoxPx.Bottom),
+                new PointF(mehediBoxPx.Left, mehediMidY)
+            };
+
+            using (SolidBrush shihabFill = new SolidBrush(Color.White))
+            using (Pen mehediBorder = new Pen(Color.FromArgb(255, 132, 34, 166), 1.6f))
+            {
+                foreach (PointF sshihabb007Pt in sshihabb007Centers)
+                {
+                    RectangleF shihabHandleRect = new RectangleF(sshihabb007Pt.X - (sshihabb007Hs * 0.5f), sshihabb007Pt.Y - (sshihabb007Hs * 0.5f), sshihabb007Hs, sshihabb007Hs);
+                    shihabG.FillRectangle(shihabFill, shihabHandleRect);
+                    shihabG.DrawRectangle(mehediBorder, shihabHandleRect.X, shihabHandleRect.Y, shihabHandleRect.Width, shihabHandleRect.Height);
                 }
             }
         }

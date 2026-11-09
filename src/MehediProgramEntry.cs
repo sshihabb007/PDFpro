@@ -168,14 +168,28 @@ namespace ShihabMehediPdfPro
                 {
                     ShihabPdfDocumentModel mehediExternalDoc = MehediPdfCoreEngine.LoadShihabPdfFromFile(shihabRealSample);
                     using (System.Drawing.Bitmap sshihabb007Rendered = ShihabWinRtRenderAndOcrEngine.RenderShihabCompositePage(
-                        mehediExternalDoc, 0, 1.25f, -1, -1))
+                        mehediExternalDoc, 0, 1.25f, -1, 0, true, new HashSet<int> { 0 }))
                     {
-                        if (mehediExternalDoc.Sshihabb007Pages.Count <= 0 || sshihabb007Rendered == null || sshihabb007Rendered.Width <= 10)
+                        MehediPdfPageModel shihabPg0 = mehediExternalDoc.Sshihabb007Pages[0];
+                        if (mehediExternalDoc.Sshihabb007Pages.Count <= 0 || sshihabb007Rendered == null || sshihabb007Rendered.Width <= 10 || shihabPg0.ShihabTextBlocks.Count < 3)
                         {
-                            Console.Error.WriteLine("SELF-TEST FAILED: External real PDF failed to load or render on STA thread: " + shihabRealSample);
+                            Console.Error.WriteLine("SELF-TEST FAILED: External real PDF failed to load, render, or index editable text blocks on STA thread: " + shihabRealSample);
                             return 4;
                         }
-                        mehediRealPdfCheck = Path.GetFileName(shihabRealSample) + " (" + mehediExternalDoc.Sshihabb007Pages.Count + " pages, rendered " + sshihabb007Rendered.Width + "x" + sshihabb007Rendered.Height + "px on [STAThread])";
+                        // Verify in-place text edit and object region crop
+                        shihabPg0.ShihabTextBlocks[0].ShihabText = "Edited In-Place by Shihab (@sshihabb007)";
+                        shihabPg0.ShihabTextBlocks[0].MehediIsModified = true;
+                        byte[] mehediCroppedObj = ShihabWinRtRenderAndOcrEngine.CropShihabPageRegionToPngBytes(mehediExternalDoc, 0, new System.Drawing.RectangleF(40f, 40f, 120f, 60f));
+                        using (System.Drawing.Bitmap sshihabb007EditedRender = ShihabWinRtRenderAndOcrEngine.RenderShihabCompositePage(
+                            mehediExternalDoc, 0, 1.25f, -1, 0, true, null))
+                        {
+                            if (sshihabb007EditedRender == null || mehediCroppedObj == null || mehediCroppedObj.Length < 64)
+                            {
+                                Console.Error.WriteLine("SELF-TEST FAILED: In-place text edit or object cutout failed.");
+                                return 5;
+                            }
+                        }
+                        mehediRealPdfCheck = Path.GetFileName(shihabRealSample) + " (" + mehediExternalDoc.Sshihabb007Pages.Count + " pages, " + shihabPg0.ShihabTextBlocks.Count + " editable text blocks indexed, rendered " + sshihabb007Rendered.Width + "x" + sshihabb007Rendered.Height + "px)";
                     }
                     break;
                 }

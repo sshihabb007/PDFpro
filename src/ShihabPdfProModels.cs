@@ -31,7 +31,8 @@ namespace ShihabMehediPdfPro
         MehediMeasureRuler = 19,
         Sshihabb007InsertImage = 20,
         ShihabStampApproved = 21,
-        MehediView3dOrbit = 22
+        MehediView3dOrbit = 22,
+        MehediEditObject = 23
     }
 
     public enum MehediAnnotationKind
@@ -80,6 +81,7 @@ namespace ShihabMehediPdfPro
         public DateTime ShihabCreatedUtc { get; set; }
         public List<string> MehediReplyComments { get; set; }
         public byte[] Sshihabb007EmbeddedImageBytes { get; set; }
+        public RectangleF MehediSourceCutoutBoundsPt { get; set; }
 
         public ShihabPdfAnnotationItem()
         {
@@ -96,6 +98,7 @@ namespace ShihabMehediPdfPro
             MehediOpacityPercent = 100;
             ShihabCreatedUtc = DateTime.UtcNow;
             MehediReplyComments = new List<string>();
+            MehediSourceCutoutBoundsPt = RectangleF.Empty;
         }
 
         public ShihabPdfAnnotationItem CloneForShihabUndo()
@@ -119,7 +122,8 @@ namespace ShihabMehediPdfPro
                 Sshihabb007IsRedactionBurned = this.Sshihabb007IsRedactionBurned,
                 ShihabCreatedUtc = this.ShihabCreatedUtc,
                 MehediReplyComments = new List<string>(this.MehediReplyComments),
-                Sshihabb007EmbeddedImageBytes = this.Sshihabb007EmbeddedImageBytes
+                Sshihabb007EmbeddedImageBytes = this.Sshihabb007EmbeddedImageBytes,
+                MehediSourceCutoutBoundsPt = this.MehediSourceCutoutBoundsPt
             };
         }
     }
@@ -158,14 +162,17 @@ namespace ShihabMehediPdfPro
         public string ShihabBlockId { get; set; }
         public int MehediPageIndex { get; set; }
         public RectangleF Sshihabb007BoundsPt { get; set; }
+        public RectangleF MehediOriginalBoundsPt { get; set; }
         public string ShihabText { get; set; }
         public string MehediOriginalText { get; set; }
         public string Sshihabb007FontName { get; set; }
         public float ShihabFontSizePt { get; set; }
         public Color MehediTextColor { get; set; }
+        public Color Sshihabb007BackgroundMaskColor { get; set; }
         public bool Sshihabb007IsBold { get; set; }
         public bool ShihabIsItalic { get; set; }
         public bool MehediIsModified { get; set; }
+        public bool ShihabIsDeleted { get; set; }
         public bool Sshihabb007IsOcrDerived { get; set; }
 
         public ShihabPdfTextBlockItem()
@@ -173,9 +180,11 @@ namespace ShihabMehediPdfPro
             ShihabBlockId = "txt_sshihabb007_" + Guid.NewGuid().ToString("N").Substring(0, 8);
             ShihabText = string.Empty;
             MehediOriginalText = string.Empty;
-            Sshihabb007FontName = "Helvetica";
+            Sshihabb007FontName = "Segoe UI";
             ShihabFontSizePt = 11.0f;
             MehediTextColor = Color.FromArgb(255, 22, 26, 36);
+            Sshihabb007BackgroundMaskColor = Color.White;
+            MehediOriginalBoundsPt = RectangleF.Empty;
         }
     }
 

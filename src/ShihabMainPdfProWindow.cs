@@ -23,7 +23,7 @@ namespace ShihabMehediPdfPro
         private int mehediActiveDocIndex = 0;
         private int sshihabb007ActivePageIndex = 0;
         private float shihabZoomScale = 1.25f;
-        private ShihabPdfToolMode mehediCurrentTool = ShihabPdfToolMode.ShihabHandPan;
+        private ShihabPdfToolMode mehediCurrentTool = ShihabPdfToolMode.MehediSelectText;
         private string sshihabb007ActiveRibbonTab = "Edit";
         private bool shihabIsBackstageVisible = false;
         private string mehediActiveBackstageMenu = "Open";
@@ -34,14 +34,28 @@ namespace ShihabMehediPdfPro
 
         private int mehediSelectedAnnotationIdx = -1;
         private int sshihabb007SelectedTextBlockIdx = -1;
+        private readonly HashSet<int> mehediMultiSelectedTextBlockIndices = new HashSet<int>();
 
-        // Interactive Mouse Drawing & Hand Panning State on Page Canvas
+        // Interactive Mouse Drawing, Object Moving/Resizing & Hand Panning State on Page Canvas
         private bool shihabIsMouseDragging = false;
+        private int mehediActiveDragSubMode = 0; // 0=None/Rubberband, 1=Pan, 2=MoveAnnot, 3=ResizeAnnot, 4=MoveTextBlock, 5=ResizeTextBlock, 6=SelectTextMarquee
+        private int sshihabb007ActiveResizeHandleIdx = -1; // 0..7 (NW, N, NE, E, SE, S, SW, W)
+        private RectangleF shihabDragInitialItemBoundsPt = RectangleF.Empty;
         private Point mehediPanMouseStartScreen = Point.Empty;
         private Point sshihabb007PanScrollStart = Point.Empty;
         private PointF mehediMouseDownPt = PointF.Empty;
         private PointF sshihabb007MouseCurrentPt = PointF.Empty;
         private List<PointF> shihabCurrentInkStrokePts = new List<PointF>();
+
+        // Live Inline Canvas Text Editor & Floating Mini-Toolbars
+        private TextBox sshihabb007InlineCanvasTextEditor;
+        private int shihabInlineEditingTextBlockIdx = -1;
+        private int mehediInlineEditingAnnotIdx = -1;
+        private Panel shihabFloatingSelectionMenuPanel;
+        private Panel mehediFloatingFormatBarPanel;
+        private ComboBox sshihabb007FormatFontCombo;
+        private Label shihabFormatSizeLabel;
+        private ContextMenuStrip mehediCanvasContextMenu;
 
         // Top-Level UI Layout Panels
         private Panel mehediTopPurpleTitleBar;
@@ -521,7 +535,7 @@ namespace ShihabMehediPdfPro
                 Location = new Point(40, 18),
                 SizeMode = PictureBoxSizeMode.AutoSize,
                 BackColor = Color.White,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.IBeam
             };
 
             // Subtle Page Border & Drop Shadow on the PDF Page Card
@@ -551,12 +565,20 @@ namespace ShihabMehediPdfPro
                 CenterShihabPagePictureBoxInViewport();
             };
 
+            BuildShihabCanvasInteractiveOverlaysAndMenus();
+
+            sshihabb007CenterCanvasScrollHost.Controls.Add(mehediFloatingFormatBarPanel);
+            sshihabb007CenterCanvasScrollHost.Controls.Add(shihabFloatingSelectionMenuPanel);
             sshihabb007CenterCanvasScrollHost.Controls.Add(mehediFloatingRobotBadgeBtn);
             sshihabb007CenterCanvasScrollHost.Controls.Add(shihabPagePictureBox);
             sshihabb007CenterCanvasScrollHost.Resize += (s, e) =>
             {
                 CenterShihabPagePictureBoxInViewport();
                 mehediFloatingRobotBadgeBtn.Location = new Point(Math.Max(16, sshihabb007CenterCanvasScrollHost.ClientSize.Width - 54), 14);
+                if (mehediFloatingFormatBarPanel != null)
+                {
+                    mehediFloatingFormatBarPanel.Location = new Point(Math.Max(16, (sshihabb007CenterCanvasScrollHost.ClientSize.Width - mehediFloatingFormatBarPanel.Width) / 2), 8);
+                }
             };
             sshihabb007CenterCanvasScrollHost.MouseWheel += OnShihabViewportMouseWheel;
 
@@ -798,9 +820,12 @@ namespace ShihabMehediPdfPro
                     AddShihabTallRibbonIconBtn(ref shihabX, "💾", "Save", "PDF", false, SaveCurrentShihabDocument);
                     AddMehediRibbonGroupDivider(ref shihabX);
                     AddShihabTallRibbonIconBtn(ref shihabX, "[T]", "Edit", "Text", mehediCurrentTool == ShihabPdfToolMode.Sshihabb007EditContent, () => SetShihabToolMode(ShihabPdfToolMode.Sshihabb007EditContent));
+                    AddShihabTallRibbonIconBtn(ref shihabX, "❐", "Edit", "Object", mehediCurrentTool == ShihabPdfToolMode.MehediEditObject, () => SetShihabToolMode(ShihabPdfToolMode.MehediEditObject));
                     AddShihabTallRibbonIconBtn(ref shihabX, "T+", "Add", "Text", mehediCurrentTool == ShihabPdfToolMode.ShihabAddTextBox, () => SetShihabToolMode(ShihabPdfToolMode.ShihabAddTextBox));
                     AddMehediRibbonGroupDivider(ref shihabX);
                     AddShihabTallRibbonIconBtn(ref shihabX, "🖍", "Highlight", "", mehediCurrentTool == ShihabPdfToolMode.MehediHighlight, () => SetShihabToolMode(ShihabPdfToolMode.MehediHighlight));
+                    AddShihabTallRibbonIconBtn(ref shihabX, "U_", "Underline", "", mehediCurrentTool == ShihabPdfToolMode.Sshihabb007Underline, () => SetShihabToolMode(ShihabPdfToolMode.Sshihabb007Underline));
+                    AddShihabTallRibbonIconBtn(ref shihabX, "S-", "Strikeout", "", mehediCurrentTool == ShihabPdfToolMode.ShihabStrikeout, () => SetShihabToolMode(ShihabPdfToolMode.ShihabStrikeout));
                     AddShihabTallRibbonIconBtn(ref shihabX, "📌", "Sticky", "Note", mehediCurrentTool == ShihabPdfToolMode.MehediStickyNote, () => SetShihabToolMode(ShihabPdfToolMode.MehediStickyNote));
                     AddMehediRibbonGroupDivider(ref shihabX);
                     AddShihabTallRibbonIconBtn(ref shihabX, "🔍+", "Zoom", "In", false, () => ChangeShihabZoom(0.15f));
@@ -837,15 +862,15 @@ namespace ShihabMehediPdfPro
 
                 case "Edit": // Exact Foxit Edit Tab (Screenshot 3!)
                     AddShihabTallRibbonIconBtn(ref shihabX, "[T]", "Edit", "Text", mehediCurrentTool == ShihabPdfToolMode.Sshihabb007EditContent, () => SetShihabToolMode(ShihabPdfToolMode.Sshihabb007EditContent));
-                    AddShihabTallRibbonIconBtn(ref shihabX, "❐", "Edit", "Object ▾", false, EditSelectedShihabTextBlockModal);
-                    AddShihabTallRibbonIconBtn(ref shihabX, "AB", "Link &", "Join Text", false, EditSelectedShihabTextBlockModal);
-                    AddShihabTallRibbonIconBtn(ref shihabX, "ABC✓", "Check", "Spelling", false, () => ExecuteShihabLuceneQuickSearch(mehediTopSearchInputBox.Text));
-                    AddShihabTallRibbonIconBtn(ref shihabX, "A/B", "Search &", "Replace", false, () => ExecuteShihabLuceneQuickSearch(mehediTopSearchInputBox.Text));
+                    AddShihabTallRibbonIconBtn(ref shihabX, "❐", "Edit", "Object ▾", mehediCurrentTool == ShihabPdfToolMode.MehediEditObject, () => SetShihabToolMode(ShihabPdfToolMode.MehediEditObject));
+                    AddShihabTallRibbonIconBtn(ref shihabX, "AB", "Link &", "Join Text", false, JoinOrInlineEditShihabSelectedTextBlocks);
+                    AddShihabTallRibbonIconBtn(ref shihabX, "ABC✓", "Check", "Spelling", false, () => ShihabDialogsAndToolsWindows.ShowShihabSearchAndReplaceStudio(this, ShihabActiveDoc, sshihabb007ActivePageIndex, RefreshAllShihabWorkstationPanels));
+                    AddShihabTallRibbonIconBtn(ref shihabX, "A/B", "Search &", "Replace", false, () => ShihabDialogsAndToolsWindows.ShowShihabSearchAndReplaceStudio(this, ShihabActiveDoc, sshihabb007ActivePageIndex, RefreshAllShihabWorkstationPanels));
                     AddMehediRibbonGroupDivider(ref shihabX);
                     AddShihabTallRibbonIconBtn(ref shihabX, "T+", "Add", "Text", mehediCurrentTool == ShihabPdfToolMode.ShihabAddTextBox, () => SetShihabToolMode(ShihabPdfToolMode.ShihabAddTextBox));
                     AddShihabTallRibbonIconBtn(ref shihabX, "🖼+", "Add", "Images ▾", false, InsertShihabImageOverlayOnActivePage);
                     AddShihabTallRibbonIconBtn(ref shihabX, "▭", "Add", "Shapes ▾", mehediCurrentTool == ShihabPdfToolMode.ShihabRectangleShape, () => SetShihabToolMode(ShihabPdfToolMode.ShihabRectangleShape));
-                    AddShihabTallRibbonIconBtn(ref shihabX, "¶", "Reflow", "Editing", false, EditSelectedShihabTextBlockModal);
+                    AddShihabTallRibbonIconBtn(ref shihabX, "¶", "Reflow", "Editing", mehediCurrentTool == ShihabPdfToolMode.Sshihabb007EditContent, () => SetShihabToolMode(ShihabPdfToolMode.Sshihabb007EditContent));
                     AddMehediRibbonGroupDivider(ref shihabX);
                     AddShihabTallRibbonIconBtn(ref shihabX, "🔗", "Link", "", mehediCurrentTool == ShihabPdfToolMode.ShihabRectangleShape, () => SetShihabToolMode(ShihabPdfToolMode.ShihabRectangleShape));
                     AddShihabTallRibbonIconBtn(ref shihabX, "🔖", "Bookmark", "", false, AddBookmarkForCurrentShihabPage);
@@ -1782,21 +1807,233 @@ namespace ShihabMehediPdfPro
             }
         }
 
+        // =====================================================================
+        // INTERACTIVE CANVAS OVERLAYS: INLINE TEXT EDITOR, FLOATING SELECTION BAR & FORMAT BAR
+        // =====================================================================
+        private void BuildShihabCanvasInteractiveOverlaysAndMenus()
+        {
+            // 1. Live Inline Canvas Text Editor (Appears directly on the PDF page over any text block or new text box!)
+            sshihabb007InlineCanvasTextEditor = new TextBox
+            {
+                Visible = false,
+                Multiline = true,
+                AcceptsReturn = false,
+                BorderStyle = BorderStyle.FixedSingle,
+                BackColor = Color.FromArgb(255, 255, 253, 238),
+                ForeColor = Color.FromArgb(255, 22, 26, 36),
+                Font = new Font("Segoe UI", 11.0f, FontStyle.Regular)
+            };
+            sshihabb007InlineCanvasTextEditor.KeyDown += (shihabS, mehediE) =>
+            {
+                if (mehediE.KeyCode == Keys.Enter && !mehediE.Shift)
+                {
+                    mehediE.SuppressKeyPress = true;
+                    CommitShihabInlineCanvasTextEdit();
+                }
+                else if (mehediE.KeyCode == Keys.Escape)
+                {
+                    mehediE.SuppressKeyPress = true;
+                    CancelShihabInlineCanvasTextEdit();
+                }
+            };
+            shihabPagePictureBox.Controls.Add(sshihabb007InlineCanvasTextEditor);
+
+            // 2. Floating Quick-Markup & Edit Mini-Toolbar (Appears when text is marked/selected with Select tool!)
+            shihabFloatingSelectionMenuPanel = new Panel
+            {
+                Visible = false,
+                Size = new Size(462, 34),
+                BackColor = Color.FromArgb(255, 34, 37, 48),
+                Padding = new Padding(4, 3, 4, 3)
+            };
+            int shihabMx = 4;
+            AddShihabFloatingMiniBtn(shihabFloatingSelectionMenuPanel, "🖍 Highlight", ref shihabMx, 84, () => ApplyShihabMarkupToSelectedTextBlocks(MehediAnnotationKind.MehediHighlight));
+            AddShihabFloatingMiniBtn(shihabFloatingSelectionMenuPanel, "U_ Underline", ref shihabMx, 84, () => ApplyShihabMarkupToSelectedTextBlocks(MehediAnnotationKind.Sshihabb007Underline));
+            AddShihabFloatingMiniBtn(shihabFloatingSelectionMenuPanel, "S- Strikeout", ref shihabMx, 82, () => ApplyShihabMarkupToSelectedTextBlocks(MehediAnnotationKind.ShihabStrikeout));
+            AddShihabFloatingMiniBtn(shihabFloatingSelectionMenuPanel, "✏ Edit Text", ref shihabMx, 76, () =>
+            {
+                shihabFloatingSelectionMenuPanel.Visible = false;
+                if (sshihabb007SelectedTextBlockIdx >= 0)
+                {
+                    BeginShihabInlineTextBlockEdit(sshihabb007SelectedTextBlockIdx);
+                }
+            });
+            AddShihabFloatingMiniBtn(shihabFloatingSelectionMenuPanel, "📋 Copy", ref shihabMx, 60, CopyShihabSelectedTextToClipboard);
+            AddShihabFloatingMiniBtn(shihabFloatingSelectionMenuPanel, "🗑", ref shihabMx, 36, DeleteSelectedShihabAnnotationOrTextBlock);
+
+            // 3. Floating Top Formatting Bar for Edit Text / Edit Object / Add Text
+            mehediFloatingFormatBarPanel = new Panel
+            {
+                Visible = false,
+                Size = new Size(710, 36),
+                Location = new Point(120, 8),
+                BackColor = Color.FromArgb(255, 34, 37, 48)
+            };
+
+            int mehediFx = 6;
+            Label sshihabb007FmtTitle = new Label
+            {
+                Text = "✏ Format:",
+                Location = new Point(mehediFx, 9),
+                AutoSize = true,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 8.2f, FontStyle.Bold)
+            };
+            mehediFloatingFormatBarPanel.Controls.Add(sshihabb007FmtTitle);
+            mehediFx += 62;
+
+            sshihabb007FormatFontCombo = new ComboBox
+            {
+                Location = new Point(mehediFx, 6),
+                Size = new Size(118, 24),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Font = new Font("Segoe UI", 8.5f)
+            };
+            sshihabb007FormatFontCombo.Items.AddRange(new object[] { "Segoe UI", "Arial", "Times New Roman", "Calibri", "Consolas" });
+            sshihabb007FormatFontCombo.SelectedIndex = 0;
+            sshihabb007FormatFontCombo.SelectedIndexChanged += (s, e) => ApplyShihabFontFamilyToSelection(sshihabb007FormatFontCombo.SelectedItem.ToString());
+            mehediFloatingFormatBarPanel.Controls.Add(sshihabb007FormatFontCombo);
+            mehediFx += 124;
+
+            AddShihabFloatingMiniBtn(mehediFloatingFormatBarPanel, "A-", ref mehediFx, 32, () => AdjustShihabSelectedFontSize(-1.5f));
+            shihabFormatSizeLabel = new Label
+            {
+                Text = "12 pt",
+                Location = new Point(mehediFx, 9),
+                Size = new Size(40, 18),
+                TextAlign = ContentAlignment.MiddleCenter,
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 8.2f, FontStyle.Bold)
+            };
+            mehediFloatingFormatBarPanel.Controls.Add(shihabFormatSizeLabel);
+            mehediFx += 42;
+            AddShihabFloatingMiniBtn(mehediFloatingFormatBarPanel, "A+", ref mehediFx, 32, () => AdjustShihabSelectedFontSize(1.5f));
+            AddShihabFloatingMiniBtn(mehediFloatingFormatBarPanel, "B", ref mehediFx, 28, ToggleShihabSelectedBold);
+            AddShihabFloatingMiniBtn(mehediFloatingFormatBarPanel, "I", ref mehediFx, 28, ToggleShihabSelectedItalic);
+
+            // Color swatches (Black, Foxit Purple, Blue, Crimson Red, Green, Color Picker)
+            AddShihabColorSwatchBtn(mehediFloatingFormatBarPanel, ref mehediFx, Color.FromArgb(22, 26, 36));
+            AddShihabColorSwatchBtn(mehediFloatingFormatBarPanel, ref mehediFx, Color.FromArgb(132, 34, 166));
+            AddShihabColorSwatchBtn(mehediFloatingFormatBarPanel, ref mehediFx, Color.FromArgb(24, 114, 232));
+            AddShihabColorSwatchBtn(mehediFloatingFormatBarPanel, ref mehediFx, Color.FromArgb(220, 38, 38));
+            AddShihabColorSwatchBtn(mehediFloatingFormatBarPanel, ref mehediFx, Color.FromArgb(16, 185, 129));
+
+            AddShihabFloatingMiniBtn(mehediFloatingFormatBarPanel, "✏ Inline Edit", ref mehediFx, 82, () =>
+            {
+                if (sshihabb007SelectedTextBlockIdx >= 0) BeginShihabInlineTextBlockEdit(sshihabb007SelectedTextBlockIdx);
+                else if (mehediSelectedAnnotationIdx >= 0) BeginShihabInlineAnnotationEdit(mehediSelectedAnnotationIdx);
+            });
+            AddShihabFloatingMiniBtn(mehediFloatingFormatBarPanel, "❐ Clone", ref mehediFx, 62, DuplicateShihabSelectedObjectOrText);
+            AddShihabFloatingMiniBtn(mehediFloatingFormatBarPanel, "🗑 Delete", ref mehediFx, 66, DeleteSelectedShihabAnnotationOrTextBlock);
+
+            // 4. Right-Click Context Menu on PDF Page
+            mehediCanvasContextMenu = new ContextMenuStrip();
+            mehediCanvasContextMenu.Items.Add("✏ Edit Text Inline", null, (s, e) =>
+            {
+                if (sshihabb007SelectedTextBlockIdx >= 0) BeginShihabInlineTextBlockEdit(sshihabb007SelectedTextBlockIdx);
+                else if (mehediSelectedAnnotationIdx >= 0) BeginShihabInlineAnnotationEdit(mehediSelectedAnnotationIdx);
+                else EditSelectedShihabTextBlockModal();
+            });
+            mehediCanvasContextMenu.Items.Add("T+ Add New Text Here", null, (s, e) => CreateAndBeginInlineShihabTextAtPoint(mehediMouseDownPt));
+            mehediCanvasContextMenu.Items.Add(new ToolStripSeparator());
+            mehediCanvasContextMenu.Items.Add("🖍 Highlight Selected Text", null, (s, e) => ApplyShihabMarkupToSelectedTextBlocks(MehediAnnotationKind.MehediHighlight));
+            mehediCanvasContextMenu.Items.Add("U_ Underline Selected Text", null, (s, e) => ApplyShihabMarkupToSelectedTextBlocks(MehediAnnotationKind.Sshihabb007Underline));
+            mehediCanvasContextMenu.Items.Add("S- Strikeout Selected Text", null, (s, e) => ApplyShihabMarkupToSelectedTextBlocks(MehediAnnotationKind.ShihabStrikeout));
+            mehediCanvasContextMenu.Items.Add(new ToolStripSeparator());
+            mehediCanvasContextMenu.Items.Add("📋 Copy Selected Text (Ctrl+C)", null, (s, e) => CopyShihabSelectedTextToClipboard());
+            mehediCanvasContextMenu.Items.Add("❐ Duplicate Selected Object / Text (Ctrl+D)", null, (s, e) => DuplicateShihabSelectedObjectOrText());
+            mehediCanvasContextMenu.Items.Add("🗑 Delete Selected Text / Object (Del)", null, (s, e) => DeleteSelectedShihabAnnotationOrTextBlock());
+        }
+
+        private void AddShihabFloatingMiniBtn(Panel shihabHost, string mehediText, ref int sshihabb007X, int shihabW, Action mehediOnClick)
+        {
+            Button sshihabb007Btn = new Button
+            {
+                Text = mehediText,
+                Location = new Point(sshihabb007X, 4),
+                Size = new Size(shihabW, 26),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.FromArgb(255, 52, 56, 72),
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 8.0f, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            sshihabb007Btn.FlatAppearance.BorderSize = 0;
+            sshihabb007Btn.Click += (s, e) => mehediOnClick();
+            shihabHost.Controls.Add(sshihabb007Btn);
+            sshihabb007X += shihabW + 4;
+        }
+
+        private void AddShihabColorSwatchBtn(Panel shihabHost, ref int mehediX, Color sshihabb007SwatchColor)
+        {
+            Button shihabBtn = new Button
+            {
+                Location = new Point(mehediX, 7),
+                Size = new Size(20, 20),
+                FlatStyle = FlatStyle.Flat,
+                BackColor = sshihabb007SwatchColor,
+                Cursor = Cursors.Hand
+            };
+            shihabBtn.FlatAppearance.BorderColor = Color.White;
+            shihabBtn.FlatAppearance.BorderSize = 1;
+            shihabBtn.Click += (s, e) => ApplyShihabColorToSelection(sshihabb007SwatchColor);
+            shihabHost.Controls.Add(shihabBtn);
+            mehediX += 24;
+        }
+
         private void RenderActiveShihabPageToCanvas()
         {
             if (ShihabActiveDoc == null) return;
+            bool shihabShowEditableFrames =
+                mehediCurrentTool == ShihabPdfToolMode.Sshihabb007EditContent ||
+                mehediCurrentTool == ShihabPdfToolMode.MehediEditObject ||
+                mehediCurrentTool == ShihabPdfToolMode.ShihabAddTextBox;
+
             Bitmap shihabNewBmp = ShihabWinRtRenderAndOcrEngine.RenderShihabCompositePage(
                 ShihabActiveDoc,
                 sshihabb007ActivePageIndex,
                 shihabZoomScale,
                 mehediSelectedAnnotationIdx,
-                sshihabb007SelectedTextBlockIdx);
+                sshihabb007SelectedTextBlockIdx,
+                shihabShowEditableFrames,
+                mehediMultiSelectedTextBlockIndices);
 
             Image mehediOld = shihabPagePictureBox.Image;
             shihabPagePictureBox.Image = shihabNewBmp;
             if (mehediOld != null) mehediOld.Dispose();
 
             CenterShihabPagePictureBoxInViewport();
+            UpdateShihabFloatingFormatBarVisibility();
+        }
+
+        private void UpdateShihabFloatingFormatBarVisibility()
+        {
+            if (mehediFloatingFormatBarPanel == null || ShihabActiveDoc == null) return;
+            bool shihabShouldShow =
+                mehediCurrentTool == ShihabPdfToolMode.Sshihabb007EditContent ||
+                mehediCurrentTool == ShihabPdfToolMode.MehediEditObject ||
+                mehediCurrentTool == ShihabPdfToolMode.ShihabAddTextBox ||
+                sshihabb007SelectedTextBlockIdx >= 0 ||
+                mehediSelectedAnnotationIdx >= 0;
+
+            mehediFloatingFormatBarPanel.Visible = shihabShouldShow && !shihabIsBackstageVisible;
+            if (mehediFloatingFormatBarPanel.Visible)
+            {
+                mehediFloatingFormatBarPanel.Location = new Point(
+                    Math.Max(16, (sshihabb007CenterCanvasScrollHost.ClientSize.Width - mehediFloatingFormatBarPanel.Width) / 2),
+                    8);
+                mehediFloatingFormatBarPanel.BringToFront();
+
+                MehediPdfPageModel sshihabb007Pg = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+                if (sshihabb007SelectedTextBlockIdx >= 0 && sshihabb007SelectedTextBlockIdx < sshihabb007Pg.ShihabTextBlocks.Count)
+                {
+                    shihabFormatSizeLabel.Text = Math.Round(sshihabb007Pg.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx].ShihabFontSizePt) + " pt";
+                }
+                else if (mehediSelectedAnnotationIdx >= 0 && mehediSelectedAnnotationIdx < sshihabb007Pg.MehediAnnotations.Count)
+                {
+                    shihabFormatSizeLabel.Text = Math.Round(sshihabb007Pg.MehediAnnotations[mehediSelectedAnnotationIdx].Sshihabb007FontSizePt) + " pt";
+                }
+            }
         }
 
         private void CenterShihabPagePictureBoxInViewport()
@@ -1805,25 +2042,34 @@ namespace ShihabMehediPdfPro
             int shihabHostW = sshihabb007CenterCanvasScrollHost.ClientSize.Width;
             int mehediBmpW = shihabPagePictureBox.Width;
             int sshihabb007Left = Math.Max(18, (shihabHostW - mehediBmpW) / 2);
-            shihabPagePictureBox.Location = new Point(sshihabb007Left, 14);
+            int shihabTop = (mehediFloatingFormatBarPanel != null && mehediFloatingFormatBarPanel.Visible) ? 48 : 14;
+            shihabPagePictureBox.Location = new Point(sshihabb007Left, shihabTop);
         }
 
         private void OnShihabViewportMouseWheel(object shihabSender, MouseEventArgs mehediE)
         {
             if (ShihabActiveDoc == null) return;
+            if (sshihabb007InlineCanvasTextEditor != null && sshihabb007InlineCanvasTextEditor.Visible)
+            {
+                CommitShihabInlineCanvasTextEdit();
+            }
+
             if ((Control.ModifierKeys & Keys.Control) == Keys.Control)
             {
                 ChangeShihabZoom(mehediE.Delta > 0 ? 0.12f : -0.12f);
                 return;
             }
 
-            // If user scrolls past the bottom or top of the current page, smoothly transition to the next/previous page!
             int sshihabb007VertScroll = sshihabb007CenterCanvasScrollHost.VerticalScroll.Value;
             int shihabMaxScroll = sshihabb007CenterCanvasScrollHost.VerticalScroll.Maximum - sshihabb007CenterCanvasScrollHost.ClientSize.Height;
 
             if (mehediE.Delta < 0 && sshihabb007VertScroll >= Math.Max(0, shihabMaxScroll - 15) && sshihabb007ActivePageIndex < ShihabActiveDoc.Sshihabb007Pages.Count - 1)
             {
                 sshihabb007ActivePageIndex++;
+                mehediSelectedAnnotationIdx = -1;
+                sshihabb007SelectedTextBlockIdx = -1;
+                mehediMultiSelectedTextBlockIndices.Clear();
+                shihabFloatingSelectionMenuPanel.Visible = false;
                 sshihabb007CenterCanvasScrollHost.AutoScrollPosition = new Point(0, 0);
                 RenderActiveShihabPageToCanvas();
                 UpdateShihabStatusBar();
@@ -1831,23 +2077,293 @@ namespace ShihabMehediPdfPro
             else if (mehediE.Delta > 0 && sshihabb007VertScroll <= 5 && sshihabb007ActivePageIndex > 0)
             {
                 sshihabb007ActivePageIndex--;
+                mehediSelectedAnnotationIdx = -1;
+                sshihabb007SelectedTextBlockIdx = -1;
+                mehediMultiSelectedTextBlockIndices.Clear();
+                shihabFloatingSelectionMenuPanel.Visible = false;
                 RenderActiveShihabPageToCanvas();
                 UpdateShihabStatusBar();
             }
         }
 
         // =====================================================================
-        // MOUSE INTERACTIONS ON PDF CANVAS (HAND PAN, EDIT TEXT, ANNOTATIONS)
+        // LIVE INLINE CANVAS TEXT EDITOR (Type Directly on the PDF Page!)
         // =====================================================================
+        private void BeginShihabInlineTextBlockEdit(int mehediBlockIdx)
+        {
+            if (ShihabActiveDoc == null) return;
+            MehediPdfPageModel sshihabb007Page = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            if (mehediBlockIdx < 0 || mehediBlockIdx >= sshihabb007Page.ShihabTextBlocks.Count) return;
+
+            ShihabPdfTextBlockItem shihabBlock = sshihabb007Page.ShihabTextBlocks[mehediBlockIdx];
+            if (shihabBlock.ShihabIsDeleted) return;
+
+            shihabInlineEditingTextBlockIdx = mehediBlockIdx;
+            mehediInlineEditingAnnotIdx = -1;
+            sshihabb007SelectedTextBlockIdx = mehediBlockIdx;
+
+            int mehediPxX = Math.Max(2, (int)Math.Round(shihabBlock.Sshihabb007BoundsPt.X * shihabZoomScale) - 2);
+            int sshihabb007PxY = Math.Max(2, (int)Math.Round(shihabBlock.Sshihabb007BoundsPt.Y * shihabZoomScale) - 2);
+            int shihabPxW = Math.Max(140, (int)Math.Round(shihabBlock.Sshihabb007BoundsPt.Width * shihabZoomScale) + 28);
+            int mehediPxH = Math.Max(26, (int)Math.Round(shihabBlock.Sshihabb007BoundsPt.Height * shihabZoomScale) + 8);
+
+            FontStyle sshihabb007Style = FontStyle.Regular;
+            if (shihabBlock.Sshihabb007IsBold) sshihabb007Style |= FontStyle.Bold;
+            if (shihabBlock.ShihabIsItalic) sshihabb007Style |= FontStyle.Italic;
+
+            sshihabb007InlineCanvasTextEditor.Location = new Point(mehediPxX, sshihabb007PxY);
+            sshihabb007InlineCanvasTextEditor.Size = new Size(shihabPxW, mehediPxH);
+            sshihabb007InlineCanvasTextEditor.Font = new Font(
+                string.IsNullOrWhiteSpace(shihabBlock.Sshihabb007FontName) || shihabBlock.Sshihabb007FontName == "Helvetica" ? "Segoe UI" : shihabBlock.Sshihabb007FontName,
+                Math.Max(8.5f, shihabBlock.ShihabFontSizePt * shihabZoomScale * 0.85f),
+                sshihabb007Style);
+            sshihabb007InlineCanvasTextEditor.ForeColor = shihabBlock.MehediTextColor;
+            sshihabb007InlineCanvasTextEditor.BackColor = shihabBlock.Sshihabb007BackgroundMaskColor.IsEmpty
+                ? Color.FromArgb(255, 255, 253, 235)
+                : shihabBlock.Sshihabb007BackgroundMaskColor;
+            sshihabb007InlineCanvasTextEditor.Text = shihabBlock.ShihabText ?? string.Empty;
+            sshihabb007InlineCanvasTextEditor.Visible = true;
+            sshihabb007InlineCanvasTextEditor.BringToFront();
+            sshihabb007InlineCanvasTextEditor.Focus();
+            sshihabb007InlineCanvasTextEditor.SelectAll();
+        }
+
+        private void BeginShihabInlineAnnotationEdit(int shihabAnnotIdx)
+        {
+            if (ShihabActiveDoc == null) return;
+            MehediPdfPageModel mehediPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            if (shihabAnnotIdx < 0 || shihabAnnotIdx >= mehediPage.MehediAnnotations.Count) return;
+
+            ShihabPdfAnnotationItem sshihabb007Annot = mehediPage.MehediAnnotations[shihabAnnotIdx];
+            shihabInlineEditingTextBlockIdx = -1;
+            mehediInlineEditingAnnotIdx = shihabAnnotIdx;
+            mehediSelectedAnnotationIdx = shihabAnnotIdx;
+
+            int shihabPxX = Math.Max(2, (int)Math.Round(sshihabb007Annot.ShihabBoundsPt.X * shihabZoomScale));
+            int mehediPxY = Math.Max(2, (int)Math.Round(sshihabb007Annot.ShihabBoundsPt.Y * shihabZoomScale));
+            int sshihabb007PxW = Math.Max(140, (int)Math.Round(sshihabb007Annot.ShihabBoundsPt.Width * shihabZoomScale));
+            int shihabPxH = Math.Max(28, (int)Math.Round(sshihabb007Annot.ShihabBoundsPt.Height * shihabZoomScale));
+
+            sshihabb007InlineCanvasTextEditor.Location = new Point(shihabPxX, mehediPxY);
+            sshihabb007InlineCanvasTextEditor.Size = new Size(sshihabb007PxW, shihabPxH);
+            sshihabb007InlineCanvasTextEditor.Font = new Font("Segoe UI", Math.Max(8.5f, sshihabb007Annot.Sshihabb007FontSizePt * shihabZoomScale * 0.85f), FontStyle.Bold);
+            sshihabb007InlineCanvasTextEditor.ForeColor = sshihabb007Annot.Sshihabb007StrokeColor;
+            sshihabb007InlineCanvasTextEditor.BackColor = Color.FromArgb(255, 255, 253, 235);
+            sshihabb007InlineCanvasTextEditor.Text = sshihabb007Annot.Sshihabb007TextContent ?? string.Empty;
+            sshihabb007InlineCanvasTextEditor.Visible = true;
+            sshihabb007InlineCanvasTextEditor.BringToFront();
+            sshihabb007InlineCanvasTextEditor.Focus();
+            sshihabb007InlineCanvasTextEditor.SelectAll();
+        }
+
+        private void CommitShihabInlineCanvasTextEdit()
+        {
+            if (sshihabb007InlineCanvasTextEditor == null || !sshihabb007InlineCanvasTextEditor.Visible || ShihabActiveDoc == null)
+                return;
+
+            MehediPdfPageModel shihabPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            string mehediNewText = sshihabb007InlineCanvasTextEditor.Text ?? string.Empty;
+            sshihabb007InlineCanvasTextEditor.Visible = false;
+
+            if (shihabInlineEditingTextBlockIdx >= 0 && shihabInlineEditingTextBlockIdx < shihabPage.ShihabTextBlocks.Count)
+            {
+                ShihabPdfTextBlockItem sshihabb007Blk = shihabPage.ShihabTextBlocks[shihabInlineEditingTextBlockIdx];
+                if (string.IsNullOrWhiteSpace(mehediNewText))
+                {
+                    sshihabb007Blk.ShihabIsDeleted = true;
+                    sshihabb007Blk.MehediIsModified = true;
+                }
+                else
+                {
+                    sshihabb007Blk.ShihabText = mehediNewText;
+                    sshihabb007Blk.MehediIsModified = true;
+                    using (Graphics shihabMeasureG = shihabPagePictureBox.CreateGraphics())
+                    using (Font mehediFont = new Font(sshihabb007Blk.Sshihabb007FontName ?? "Segoe UI", Math.Max(7f, sshihabb007Blk.ShihabFontSizePt * 0.85f), sshihabb007Blk.Sshihabb007IsBold ? FontStyle.Bold : FontStyle.Regular))
+                    {
+                        SizeF sshihabb007Sz = shihabMeasureG.MeasureString(mehediNewText, mehediFont);
+                        sshihabb007Blk.Sshihabb007BoundsPt = new RectangleF(
+                            sshihabb007Blk.Sshihabb007BoundsPt.X,
+                            sshihabb007Blk.Sshihabb007BoundsPt.Y,
+                            Math.Max(40f, sshihabb007Sz.Width + 10f),
+                            Math.Max(sshihabb007Blk.Sshihabb007BoundsPt.Height, sshihabb007Sz.Height + 2f));
+                    }
+                }
+                RebuildShihabExtractedTextFromBlocks(shihabPage);
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+            }
+            else if (mehediInlineEditingAnnotIdx >= 0 && mehediInlineEditingAnnotIdx < shihabPage.MehediAnnotations.Count)
+            {
+                shihabPage.MehediAnnotations[mehediInlineEditingAnnotIdx].Sshihabb007TextContent = mehediNewText;
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+            }
+
+            shihabInlineEditingTextBlockIdx = -1;
+            mehediInlineEditingAnnotIdx = -1;
+            RenderActiveShihabPageToCanvas();
+            UpdateShihabStatusBar();
+        }
+
+        private void CancelShihabInlineCanvasTextEdit()
+        {
+            if (sshihabb007InlineCanvasTextEditor != null)
+            {
+                sshihabb007InlineCanvasTextEditor.Visible = false;
+            }
+            shihabInlineEditingTextBlockIdx = -1;
+            mehediInlineEditingAnnotIdx = -1;
+        }
+
+        private void CreateAndBeginInlineShihabTextAtPoint(PointF shihabPt, float mehediW = 190f, float sshihabb007H = 22f)
+        {
+            if (ShihabActiveDoc == null) return;
+            MehediPdfPageModel shihabPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            ShihabPdfTextBlockItem mehediNewBlock = new ShihabPdfTextBlockItem
+            {
+                MehediPageIndex = sshihabb007ActivePageIndex,
+                Sshihabb007BoundsPt = new RectangleF(shihabPt.X, shihabPt.Y, Math.Max(140f, mehediW), Math.Max(20f, sshihabb007H)),
+                MehediOriginalBoundsPt = RectangleF.Empty,
+                ShihabText = "Type text here...",
+                MehediOriginalText = string.Empty,
+                Sshihabb007FontName = "Segoe UI",
+                ShihabFontSizePt = 12.0f,
+                MehediTextColor = Color.FromArgb(255, 22, 26, 36),
+                Sshihabb007BackgroundMaskColor = Color.Transparent,
+                MehediIsModified = true
+            };
+            shihabPage.ShihabTextBlocks.Add(mehediNewBlock);
+            int sshihabb007NewIdx = shihabPage.ShihabTextBlocks.Count - 1;
+            sshihabb007SelectedTextBlockIdx = sshihabb007NewIdx;
+            mehediSelectedAnnotationIdx = -1;
+            ShihabActiveDoc.ShihabIsModifiedDirty = true;
+            RenderActiveShihabPageToCanvas();
+            BeginShihabInlineTextBlockEdit(sshihabb007NewIdx);
+        }
+
+        // =====================================================================
+        // MOUSE INTERACTIONS ON PDF CANVAS (SELECT, EDIT TEXT, EDIT OBJECT, MARKUPS, HAND PAN)
+        // =====================================================================
+        private int HitTestShihabResizeHandle(RectangleF shihabBoundsPt, PointF mehediClickPt)
+        {
+            if (shihabBoundsPt.IsEmpty) return -1;
+            float sshihabb007Tol = Math.Max(5.5f, 7.5f / shihabZoomScale);
+            float shihabMidX = shihabBoundsPt.Left + (shihabBoundsPt.Width * 0.5f);
+            float mehediMidY = shihabBoundsPt.Top + (shihabBoundsPt.Height * 0.5f);
+
+            PointF[] sshihabb007Handles = new PointF[]
+            {
+                new PointF(shihabBoundsPt.Left, shihabBoundsPt.Top),     // 0: NW
+                new PointF(shihabMidX, shihabBoundsPt.Top),              // 1: N
+                new PointF(shihabBoundsPt.Right, shihabBoundsPt.Top),    // 2: NE
+                new PointF(shihabBoundsPt.Right, mehediMidY),            // 3: E
+                new PointF(shihabBoundsPt.Right, shihabBoundsPt.Bottom), // 4: SE
+                new PointF(shihabMidX, shihabBoundsPt.Bottom),           // 5: S
+                new PointF(shihabBoundsPt.Left, shihabBoundsPt.Bottom),  // 6: SW
+                new PointF(shihabBoundsPt.Left, mehediMidY)              // 7: W
+            };
+
+            for (int shihabI = 0; shihabI < sshihabb007Handles.Length; shihabI++)
+            {
+                if (Math.Abs(mehediClickPt.X - sshihabb007Handles[shihabI].X) <= sshihabb007Tol &&
+                    Math.Abs(mehediClickPt.Y - sshihabb007Handles[shihabI].Y) <= sshihabb007Tol)
+                {
+                    return shihabI;
+                }
+            }
+            return -1;
+        }
+
+        private static RectangleF ComputeShihabResizedBounds(RectangleF shihabInitial, int mehediHandleIdx, float sshihabb007Dx, float shihabDy)
+        {
+            float mehediLeft = shihabInitial.Left;
+            float sshihabb007Top = shihabInitial.Top;
+            float shihabRight = shihabInitial.Right;
+            float mehediBottom = shihabInitial.Bottom;
+
+            if (mehediHandleIdx == 0 || mehediHandleIdx == 6 || mehediHandleIdx == 7) mehediLeft += sshihabb007Dx;
+            if (mehediHandleIdx == 2 || mehediHandleIdx == 3 || mehediHandleIdx == 4) shihabRight += sshihabb007Dx;
+            if (mehediHandleIdx == 0 || mehediHandleIdx == 1 || mehediHandleIdx == 2) sshihabb007Top += shihabDy;
+            if (mehediHandleIdx == 4 || mehediHandleIdx == 5 || mehediHandleIdx == 6) mehediBottom += shihabDy;
+
+            float sshihabb007FinalX = Math.Min(mehediLeft, shihabRight);
+            float shihabFinalY = Math.Min(sshihabb007Top, mehediBottom);
+            float mehediFinalW = Math.Max(18f, Math.Abs(shihabRight - mehediLeft));
+            float sshihabb007FinalH = Math.Max(12f, Math.Abs(mehediBottom - sshihabb007Top));
+            return new RectangleF(sshihabb007FinalX, shihabFinalY, mehediFinalW, sshihabb007FinalH);
+        }
+
+        private int FindShihabAnnotationAtPoint(MehediPdfPageModel shihabPage, PointF mehediPt)
+        {
+            for (int sshihabb007Idx = shihabPage.MehediAnnotations.Count - 1; sshihabb007Idx >= 0; sshihabb007Idx--)
+            {
+                RectangleF shihabInflated = shihabPage.MehediAnnotations[sshihabb007Idx].ShihabBoundsPt;
+                shihabInflated.Inflate(3f, 3f);
+                if (shihabInflated.Contains(mehediPt))
+                {
+                    return sshihabb007Idx;
+                }
+            }
+            return -1;
+        }
+
+        private int FindShihabTextBlockAtPoint(MehediPdfPageModel shihabPage, PointF mehediPt)
+        {
+            for (int sshihabb007Idx = shihabPage.ShihabTextBlocks.Count - 1; sshihabb007Idx >= 0; sshihabb007Idx--)
+            {
+                ShihabPdfTextBlockItem shihabTb = shihabPage.ShihabTextBlocks[sshihabb007Idx];
+                if (shihabTb.ShihabIsDeleted) continue;
+                RectangleF mehediInflated = shihabTb.Sshihabb007BoundsPt;
+                mehediInflated.Inflate(3f, 2f);
+                if (mehediInflated.Contains(mehediPt))
+                {
+                    return sshihabb007Idx;
+                }
+            }
+            return -1;
+        }
+
         private void OnShihabCanvasMouseDown(object shihabSender, MouseEventArgs mehediE)
         {
-            if (mehediE.Button != MouseButtons.Left || ShihabActiveDoc == null) return;
+            if (ShihabActiveDoc == null) return;
+            if (sshihabb007InlineCanvasTextEditor != null && sshihabb007InlineCanvasTextEditor.Visible)
+            {
+                CommitShihabInlineCanvasTextEdit();
+            }
+
             MehediPdfPageModel sshihabb007Page = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
             PointF shihabPt = new PointF(mehediE.X / shihabZoomScale, mehediE.Y / shihabZoomScale);
+            mehediMouseDownPt = shihabPt;
+            sshihabb007MouseCurrentPt = shihabPt;
 
-            if (mehediCurrentTool == ShihabPdfToolMode.ShihabHandPan)
+            // Right-Click opens the Foxit Page Context Menu!
+            if (mehediE.Button == MouseButtons.Right)
+            {
+                int shihabRightAnnot = FindShihabAnnotationAtPoint(sshihabb007Page, shihabPt);
+                int mehediRightText = FindShihabTextBlockAtPoint(sshihabb007Page, shihabPt);
+                if (shihabRightAnnot >= 0)
+                {
+                    mehediSelectedAnnotationIdx = shihabRightAnnot;
+                    sshihabb007SelectedTextBlockIdx = -1;
+                }
+                else if (mehediRightText >= 0)
+                {
+                    sshihabb007SelectedTextBlockIdx = mehediRightText;
+                    mehediSelectedAnnotationIdx = -1;
+                    if (!mehediMultiSelectedTextBlockIndices.Contains(mehediRightText))
+                    {
+                        mehediMultiSelectedTextBlockIndices.Clear();
+                        mehediMultiSelectedTextBlockIndices.Add(mehediRightText);
+                    }
+                }
+                RenderActiveShihabPageToCanvas();
+                mehediCanvasContextMenu.Show(shihabPagePictureBox, mehediE.Location);
+                return;
+            }
+
+            // Middle-Click or Hand Tool pans the page
+            if (mehediE.Button == MouseButtons.Middle || mehediCurrentTool == ShihabPdfToolMode.ShihabHandPan)
             {
                 shihabIsMouseDragging = true;
+                mehediActiveDragSubMode = 1; // Pan
                 mehediPanMouseStartScreen = shihabPagePictureBox.PointToScreen(mehediE.Location);
                 sshihabb007PanScrollStart = new Point(
                     -sshihabb007CenterCanvasScrollHost.AutoScrollPosition.X,
@@ -1855,44 +2371,158 @@ namespace ShihabMehediPdfPro
                 return;
             }
 
-            if (mehediCurrentTool == ShihabPdfToolMode.Sshihabb007EditContent || mehediCurrentTool == ShihabPdfToolMode.MehediSelectText)
+            if (mehediE.Button != MouseButtons.Left) return;
+            shihabFloatingSelectionMenuPanel.Visible = false;
+
+            // 1. Check if clicking one of the 8 resize handles of the currently selected Annotation
+            if (mehediSelectedAnnotationIdx >= 0 && mehediSelectedAnnotationIdx < sshihabb007Page.MehediAnnotations.Count)
             {
+                int shihabHandle = HitTestShihabResizeHandle(sshihabb007Page.MehediAnnotations[mehediSelectedAnnotationIdx].ShihabBoundsPt, shihabPt);
+                if (shihabHandle >= 0)
+                {
+                    shihabIsMouseDragging = true;
+                    mehediActiveDragSubMode = 3; // ResizeAnnot
+                    sshihabb007ActiveResizeHandleIdx = shihabHandle;
+                    shihabDragInitialItemBoundsPt = sshihabb007Page.MehediAnnotations[mehediSelectedAnnotationIdx].ShihabBoundsPt;
+                    return;
+                }
+            }
+
+            // 2. Check if clicking one of the 8 resize handles of the currently selected TextBlock
+            if (sshihabb007SelectedTextBlockIdx >= 0 && sshihabb007SelectedTextBlockIdx < sshihabb007Page.ShihabTextBlocks.Count)
+            {
+                int mehediHandle = HitTestShihabResizeHandle(sshihabb007Page.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx].Sshihabb007BoundsPt, shihabPt);
+                if (mehediHandle >= 0)
+                {
+                    shihabIsMouseDragging = true;
+                    mehediActiveDragSubMode = 5; // ResizeTextBlock
+                    sshihabb007ActiveResizeHandleIdx = mehediHandle;
+                    shihabDragInitialItemBoundsPt = sshihabb007Page.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx].Sshihabb007BoundsPt;
+                    return;
+                }
+            }
+
+            // 3. Tool-Specific MouseDown Logic
+            if (mehediCurrentTool == ShihabPdfToolMode.MehediEditObject)
+            {
+                int shihabHitAnnot = FindShihabAnnotationAtPoint(sshihabb007Page, shihabPt);
+                if (shihabHitAnnot >= 0)
+                {
+                    mehediSelectedAnnotationIdx = shihabHitAnnot;
+                    sshihabb007SelectedTextBlockIdx = -1;
+                    mehediMultiSelectedTextBlockIndices.Clear();
+                    shihabIsMouseDragging = true;
+                    mehediActiveDragSubMode = 2; // MoveAnnot
+                    shihabDragInitialItemBoundsPt = sshihabb007Page.MehediAnnotations[shihabHitAnnot].ShihabBoundsPt;
+                    RenderActiveShihabPageToCanvas();
+                    return;
+                }
+
+                int mehediHitText = FindShihabTextBlockAtPoint(sshihabb007Page, shihabPt);
+                if (mehediHitText >= 0)
+                {
+                    sshihabb007SelectedTextBlockIdx = mehediHitText;
+                    mehediSelectedAnnotationIdx = -1;
+                    mehediMultiSelectedTextBlockIndices.Clear();
+                    shihabIsMouseDragging = true;
+                    mehediActiveDragSubMode = 4; // MoveTextBlock
+                    shihabDragInitialItemBoundsPt = sshihabb007Page.ShihabTextBlocks[mehediHitText].Sshihabb007BoundsPt;
+                    RenderActiveShihabPageToCanvas();
+                    return;
+                }
+
+                // Dragging on empty/graphic space in Edit Object mode cuts/captures a visual object region!
                 mehediSelectedAnnotationIdx = -1;
-                for (int mehediIdx = sshihabb007Page.MehediAnnotations.Count - 1; mehediIdx >= 0; mehediIdx--)
-                {
-                    if (sshihabb007Page.MehediAnnotations[mehediIdx].ShihabBoundsPt.Contains(shihabPt))
-                    {
-                        mehediSelectedAnnotationIdx = mehediIdx;
-                        break;
-                    }
-                }
-
                 sshihabb007SelectedTextBlockIdx = -1;
-                for (int shihabIdx = 0; shihabIdx < sshihabb007Page.ShihabTextBlocks.Count; shihabIdx++)
-                {
-                    if (sshihabb007Page.ShihabTextBlocks[shihabIdx].Sshihabb007BoundsPt.Contains(shihabPt))
-                    {
-                        sshihabb007SelectedTextBlockIdx = shihabIdx;
-                        break;
-                    }
-                }
-
+                mehediMultiSelectedTextBlockIndices.Clear();
+                shihabIsMouseDragging = true;
+                mehediActiveDragSubMode = 0;
                 RenderActiveShihabPageToCanvas();
                 return;
             }
 
+            if (mehediCurrentTool == ShihabPdfToolMode.Sshihabb007EditContent)
+            {
+                int shihabHitText = FindShihabTextBlockAtPoint(sshihabb007Page, shihabPt);
+                if (shihabHitText >= 0)
+                {
+                    mehediSelectedAnnotationIdx = -1;
+                    mehediMultiSelectedTextBlockIndices.Clear();
+                    sshihabb007SelectedTextBlockIdx = shihabHitText;
+                    shihabIsMouseDragging = true;
+                    mehediActiveDragSubMode = 4; // MoveTextBlock if dragged, or Inline Edit on MouseUp if clicked without dragging!
+                    shihabDragInitialItemBoundsPt = sshihabb007Page.ShihabTextBlocks[shihabHitText].Sshihabb007BoundsPt;
+                    RenderActiveShihabPageToCanvas();
+                    return;
+                }
+
+                int mehediHitAnnot = FindShihabAnnotationAtPoint(sshihabb007Page, shihabPt);
+                if (mehediHitAnnot >= 0)
+                {
+                    mehediSelectedAnnotationIdx = mehediHitAnnot;
+                    sshihabb007SelectedTextBlockIdx = -1;
+                    shihabIsMouseDragging = true;
+                    mehediActiveDragSubMode = 2; // MoveAnnot
+                    shihabDragInitialItemBoundsPt = sshihabb007Page.MehediAnnotations[mehediHitAnnot].ShihabBoundsPt;
+                    RenderActiveShihabPageToCanvas();
+                    return;
+                }
+
+                // Clicked blank area in Edit Text mode -> create new editable text block right here!
+                CreateAndBeginInlineShihabTextAtPoint(shihabPt);
+                return;
+            }
+
+            if (mehediCurrentTool == ShihabPdfToolMode.MehediSelectText)
+            {
+                int shihabHitAnnot = FindShihabAnnotationAtPoint(sshihabb007Page, shihabPt);
+                if (shihabHitAnnot >= 0)
+                {
+                    mehediSelectedAnnotationIdx = shihabHitAnnot;
+                    sshihabb007SelectedTextBlockIdx = -1;
+                    mehediMultiSelectedTextBlockIndices.Clear();
+                    shihabIsMouseDragging = true;
+                    mehediActiveDragSubMode = 2; // MoveAnnot
+                    shihabDragInitialItemBoundsPt = sshihabb007Page.MehediAnnotations[shihabHitAnnot].ShihabBoundsPt;
+                    RenderActiveShihabPageToCanvas();
+                    return;
+                }
+
+                mehediSelectedAnnotationIdx = -1;
+                mehediMultiSelectedTextBlockIndices.Clear();
+                int mehediHitText = FindShihabTextBlockAtPoint(sshihabb007Page, shihabPt);
+                sshihabb007SelectedTextBlockIdx = mehediHitText;
+                if (mehediHitText >= 0)
+                {
+                    mehediMultiSelectedTextBlockIndices.Add(mehediHitText);
+                }
+
+                shihabIsMouseDragging = true;
+                mehediActiveDragSubMode = 6; // SelectTextMarquee
+                RenderActiveShihabPageToCanvas();
+                return;
+            }
+
+            // All other tools (Add Text, Highlight, Underline, Strikeout, Sticky Note, Shapes, Ink, Redaction, Forms)
+            mehediActiveDragSubMode = 0;
             shihabIsMouseDragging = true;
-            mehediMouseDownPt = shihabPt;
-            sshihabb007MouseCurrentPt = shihabPt;
             shihabCurrentInkStrokePts.Clear();
             shihabCurrentInkStrokePts.Add(shihabPt);
         }
 
         private void OnMehediCanvasMouseMove(object shihabSender, MouseEventArgs mehediE)
         {
-            if (!shihabIsMouseDragging) return;
+            if (ShihabActiveDoc == null) return;
+            MehediPdfPageModel sshihabb007Page = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            PointF shihabPt = new PointF(mehediE.X / shihabZoomScale, mehediE.Y / shihabZoomScale);
 
-            if (mehediCurrentTool == ShihabPdfToolMode.ShihabHandPan)
+            if (!shihabIsMouseDragging)
+            {
+                UpdateShihabCanvasCursorOnHover(sshihabb007Page, shihabPt);
+                return;
+            }
+
+            if (mehediActiveDragSubMode == 1) // Hand Pan
             {
                 Point shihabNowScreen = shihabPagePictureBox.PointToScreen(mehediE.Location);
                 int mehediDx = mehediPanMouseStartScreen.X - shihabNowScreen.X;
@@ -1903,8 +2533,85 @@ namespace ShihabMehediPdfPro
                 return;
             }
 
-            PointF shihabPt = new PointF(mehediE.X / shihabZoomScale, mehediE.Y / shihabZoomScale);
             sshihabb007MouseCurrentPt = shihabPt;
+            float shihabDeltaX = shihabPt.X - mehediMouseDownPt.X;
+            float mehediDeltaY = shihabPt.Y - mehediMouseDownPt.Y;
+
+            if (mehediActiveDragSubMode == 2 && mehediSelectedAnnotationIdx >= 0 && mehediSelectedAnnotationIdx < sshihabb007Page.MehediAnnotations.Count)
+            {
+                // Move Selected Annotation / Object
+                ShihabPdfAnnotationItem sshihabb007Annot = sshihabb007Page.MehediAnnotations[mehediSelectedAnnotationIdx];
+                sshihabb007Annot.ShihabBoundsPt = new RectangleF(
+                    shihabDragInitialItemBoundsPt.X + shihabDeltaX,
+                    shihabDragInitialItemBoundsPt.Y + mehediDeltaY,
+                    shihabDragInitialItemBoundsPt.Width,
+                    shihabDragInitialItemBoundsPt.Height);
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RenderActiveShihabPageToCanvas();
+                return;
+            }
+
+            if (mehediActiveDragSubMode == 3 && mehediSelectedAnnotationIdx >= 0 && mehediSelectedAnnotationIdx < sshihabb007Page.MehediAnnotations.Count)
+            {
+                // Resize Selected Annotation / Object via 8 handles
+                ShihabPdfAnnotationItem sshihabb007Annot = sshihabb007Page.MehediAnnotations[mehediSelectedAnnotationIdx];
+                sshihabb007Annot.ShihabBoundsPt = ComputeShihabResizedBounds(shihabDragInitialItemBoundsPt, sshihabb007ActiveResizeHandleIdx, shihabDeltaX, mehediDeltaY);
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RenderActiveShihabPageToCanvas();
+                return;
+            }
+
+            if (mehediActiveDragSubMode == 4 && sshihabb007SelectedTextBlockIdx >= 0 && sshihabb007SelectedTextBlockIdx < sshihabb007Page.ShihabTextBlocks.Count)
+            {
+                // Move Selected Text Block (only if dragged more than 3pt so single click still opens Inline Editor!)
+                if (Math.Abs(shihabDeltaX) > 3.0f || Math.Abs(mehediDeltaY) > 3.0f)
+                {
+                    ShihabPdfTextBlockItem shihabTb = sshihabb007Page.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx];
+                    shihabTb.Sshihabb007BoundsPt = new RectangleF(
+                        shihabDragInitialItemBoundsPt.X + shihabDeltaX,
+                        shihabDragInitialItemBoundsPt.Y + mehediDeltaY,
+                        shihabDragInitialItemBoundsPt.Width,
+                        shihabDragInitialItemBoundsPt.Height);
+                    shihabTb.MehediIsModified = true;
+                    ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                    RenderActiveShihabPageToCanvas();
+                }
+                return;
+            }
+
+            if (mehediActiveDragSubMode == 5 && sshihabb007SelectedTextBlockIdx >= 0 && sshihabb007SelectedTextBlockIdx < sshihabb007Page.ShihabTextBlocks.Count)
+            {
+                // Resize Selected Text Block via 8 handles
+                ShihabPdfTextBlockItem shihabTb = sshihabb007Page.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx];
+                shihabTb.Sshihabb007BoundsPt = ComputeShihabResizedBounds(shihabDragInitialItemBoundsPt, sshihabb007ActiveResizeHandleIdx, shihabDeltaX, mehediDeltaY);
+                shihabTb.MehediIsModified = true;
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RenderActiveShihabPageToCanvas();
+                return;
+            }
+
+            if (mehediActiveDragSubMode == 6) // SelectTextMarquee ("Mark Text" live selection)
+            {
+                RectangleF sshihabb007Marquee = new RectangleF(
+                    Math.Min(mehediMouseDownPt.X, shihabPt.X),
+                    Math.Min(mehediMouseDownPt.Y, shihabPt.Y),
+                    Math.Max(2f, Math.Abs(shihabPt.X - mehediMouseDownPt.X)),
+                    Math.Max(2f, Math.Abs(shihabPt.Y - mehediMouseDownPt.Y)));
+
+                mehediMultiSelectedTextBlockIndices.Clear();
+                for (int shihabI = 0; shihabI < sshihabb007Page.ShihabTextBlocks.Count; shihabI++)
+                {
+                    ShihabPdfTextBlockItem mehediTb = sshihabb007Page.ShihabTextBlocks[shihabI];
+                    if (!mehediTb.ShihabIsDeleted && mehediTb.Sshihabb007BoundsPt.IntersectsWith(sshihabb007Marquee))
+                    {
+                        mehediMultiSelectedTextBlockIndices.Add(shihabI);
+                        if (sshihabb007SelectedTextBlockIdx < 0) sshihabb007SelectedTextBlockIdx = shihabI;
+                    }
+                }
+                shihabPagePictureBox.Invalidate();
+                return;
+            }
+
             if (mehediCurrentTool == ShihabPdfToolMode.Sshihabb007FreehandInk)
             {
                 shihabCurrentInkStrokePts.Add(shihabPt);
@@ -1912,63 +2619,175 @@ namespace ShihabMehediPdfPro
             shihabPagePictureBox.Invalidate();
         }
 
+        private void UpdateShihabCanvasCursorOnHover(MehediPdfPageModel shihabPage, PointF mehediPt)
+        {
+            if (mehediCurrentTool == ShihabPdfToolMode.ShihabHandPan)
+            {
+                shihabPagePictureBox.Cursor = Cursors.Hand;
+                return;
+            }
+
+            if (mehediSelectedAnnotationIdx >= 0 && mehediSelectedAnnotationIdx < shihabPage.MehediAnnotations.Count)
+            {
+                int sshihabb007H = HitTestShihabResizeHandle(shihabPage.MehediAnnotations[mehediSelectedAnnotationIdx].ShihabBoundsPt, mehediPt);
+                if (sshihabb007H >= 0)
+                {
+                    shihabPagePictureBox.Cursor = GetShihabResizeCursorForHandle(sshihabb007H);
+                    return;
+                }
+            }
+            if (sshihabb007SelectedTextBlockIdx >= 0 && sshihabb007SelectedTextBlockIdx < shihabPage.ShihabTextBlocks.Count)
+            {
+                int shihabH = HitTestShihabResizeHandle(shihabPage.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx].Sshihabb007BoundsPt, mehediPt);
+                if (shihabH >= 0)
+                {
+                    shihabPagePictureBox.Cursor = GetShihabResizeCursorForHandle(shihabH);
+                    return;
+                }
+            }
+
+            if (FindShihabAnnotationAtPoint(shihabPage, mehediPt) >= 0)
+            {
+                shihabPagePictureBox.Cursor = Cursors.SizeAll;
+                return;
+            }
+
+            if (FindShihabTextBlockAtPoint(shihabPage, mehediPt) >= 0)
+            {
+                shihabPagePictureBox.Cursor = (mehediCurrentTool == ShihabPdfToolMode.MehediEditObject) ? Cursors.SizeAll : Cursors.IBeam;
+                return;
+            }
+
+            shihabPagePictureBox.Cursor = (mehediCurrentTool == ShihabPdfToolMode.MehediSelectText || mehediCurrentTool == ShihabPdfToolMode.Sshihabb007EditContent)
+                ? Cursors.IBeam
+                : Cursors.Cross;
+        }
+
+        private static Cursor GetShihabResizeCursorForHandle(int shihabHandleIdx)
+        {
+            switch (shihabHandleIdx)
+            {
+                case 0:
+                case 4:
+                    return Cursors.SizeNWSE;
+                case 2:
+                case 6:
+                    return Cursors.SizeNESW;
+                case 1:
+                case 5:
+                    return Cursors.SizeNS;
+                default:
+                    return Cursors.SizeWE;
+            }
+        }
+
         private void OnSshihabb007CanvasMouseUp(object shihabSender, MouseEventArgs mehediE)
         {
             if (!shihabIsMouseDragging || ShihabActiveDoc == null) return;
             shihabIsMouseDragging = false;
 
-            if (mehediCurrentTool == ShihabPdfToolMode.ShihabHandPan) return;
+            int sshihabb007FinishedSubMode = mehediActiveDragSubMode;
+            mehediActiveDragSubMode = 0;
+            sshihabb007ActiveResizeHandleIdx = -1;
+
+            if (sshihabb007FinishedSubMode == 1) return; // Pan finished
 
             MehediPdfPageModel sshihabb007Page = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
             PointF shihabUpPt = new PointF(mehediE.X / shihabZoomScale, mehediE.Y / shihabZoomScale);
-            RectangleF mehediDragRect = new RectangleF(
+            float mehediDragDist = (float)Math.Sqrt(Math.Pow(shihabUpPt.X - mehediMouseDownPt.X, 2) + Math.Pow(shihabUpPt.Y - mehediMouseDownPt.Y, 2));
+
+            // If in Edit Text mode and the user clicked a text block without dragging, immediately open the Live Inline Text Editor!
+            if (sshihabb007FinishedSubMode == 4)
+            {
+                if (mehediDragDist <= 3.5f && sshihabb007SelectedTextBlockIdx >= 0 && mehediCurrentTool == ShihabPdfToolMode.Sshihabb007EditContent)
+                {
+                    BeginShihabInlineTextBlockEdit(sshihabb007SelectedTextBlockIdx);
+                }
+                else
+                {
+                    RenderActiveShihabPageToCanvas();
+                }
+                return;
+            }
+
+            if (sshihabb007FinishedSubMode == 2 || sshihabb007FinishedSubMode == 3 || sshihabb007FinishedSubMode == 5)
+            {
+                RenderActiveShihabPageToCanvas();
+                return;
+            }
+
+            // If in Select ("Mark Text") mode, finalize the text selection and show the Floating Quick-Markup Toolbar!
+            if (sshihabb007FinishedSubMode == 6)
+            {
+                RenderActiveShihabPageToCanvas();
+                if (mehediMultiSelectedTextBlockIndices.Count > 0)
+                {
+                    int shihabPopX = Math.Max(16, Math.Min(sshihabb007CenterCanvasScrollHost.ClientSize.Width - shihabFloatingSelectionMenuPanel.Width - 16, shihabPagePictureBox.Left + mehediE.X - 80));
+                    int mehediPopY = Math.Max(46, shihabPagePictureBox.Top + mehediE.Y - 46);
+                    shihabFloatingSelectionMenuPanel.Location = new Point(shihabPopX, mehediPopY);
+                    shihabFloatingSelectionMenuPanel.Visible = true;
+                    shihabFloatingSelectionMenuPanel.BringToFront();
+                }
+                return;
+            }
+
+            RectangleF mehediRawDragRect = new RectangleF(
                 Math.Min(mehediMouseDownPt.X, shihabUpPt.X),
                 Math.Min(mehediMouseDownPt.Y, shihabUpPt.Y),
-                Math.Max(64f, Math.Abs(shihabUpPt.X - mehediMouseDownPt.X)),
-                Math.Max(22f, Math.Abs(shihabUpPt.Y - mehediMouseDownPt.Y)));
+                Math.Abs(shihabUpPt.X - mehediMouseDownPt.X),
+                Math.Abs(shihabUpPt.Y - mehediMouseDownPt.Y));
+
+            RectangleF mehediDragRect = new RectangleF(
+                mehediRawDragRect.X,
+                mehediRawDragRect.Y,
+                Math.Max(64f, mehediRawDragRect.Width),
+                Math.Max(20f, mehediRawDragRect.Height));
+
+            // If in Edit Object mode and user dragged a selection box on the page, crop/extract that visual object from the page so it can be moved, resized, or deleted!
+            if (mehediCurrentTool == ShihabPdfToolMode.MehediEditObject)
+            {
+                if (mehediRawDragRect.Width >= 14f && mehediRawDragRect.Height >= 10f)
+                {
+                    byte[] sshihabb007CroppedPng = ShihabWinRtRenderAndOcrEngine.CropShihabPageRegionToPngBytes(ShihabActiveDoc, sshihabb007ActivePageIndex, mehediRawDragRect);
+                    if (sshihabb007CroppedPng != null && sshihabb007CroppedPng.Length > 0)
+                    {
+                        sshihabb007Page.MehediAnnotations.Add(new ShihabPdfAnnotationItem
+                        {
+                            MehediPageIndex = sshihabb007ActivePageIndex,
+                            Sshihabb007Kind = MehediAnnotationKind.MehediImageOverlay,
+                            ShihabBoundsPt = mehediRawDragRect,
+                            MehediSourceCutoutBoundsPt = mehediRawDragRect,
+                            Sshihabb007EmbeddedImageBytes = sshihabb007CroppedPng,
+                            Sshihabb007TextContent = "Editable Page Object"
+                        });
+                        mehediSelectedAnnotationIdx = sshihabb007Page.MehediAnnotations.Count - 1;
+                        sshihabb007SelectedTextBlockIdx = -1;
+                        ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                        RenderActiveShihabPageToCanvas();
+                    }
+                }
+                return;
+            }
 
             switch (mehediCurrentTool)
             {
                 case ShihabPdfToolMode.ShihabAddTextBox:
-                    sshihabb007Page.MehediAnnotations.Add(new ShihabPdfAnnotationItem
-                    {
-                        MehediPageIndex = sshihabb007ActivePageIndex,
-                        Sshihabb007Kind = MehediAnnotationKind.ShihabTextBox,
-                        ShihabBoundsPt = mehediDragRect,
-                        Sshihabb007TextContent = "Added Text Block (@sshihabb007)",
-                        Sshihabb007StrokeColor = Color.FromArgb(255, 132, 34, 166),
-                        ShihabFillColor = Color.FromArgb(25, 132, 34, 166)
-                    });
-                    break;
+                    CreateAndBeginInlineShihabTextAtPoint(
+                        new PointF(mehediRawDragRect.X, mehediRawDragRect.Y),
+                        Math.Max(180f, mehediRawDragRect.Width),
+                        Math.Max(24f, mehediRawDragRect.Height));
+                    return;
 
                 case ShihabPdfToolMode.MehediHighlight:
-                    sshihabb007Page.MehediAnnotations.Add(new ShihabPdfAnnotationItem
-                    {
-                        MehediPageIndex = sshihabb007ActivePageIndex,
-                        Sshihabb007Kind = MehediAnnotationKind.MehediHighlight,
-                        ShihabBoundsPt = mehediDragRect,
-                        Sshihabb007TextContent = "Highlight"
-                    });
+                    ApplyShihabSmartDragMarkup(sshihabb007Page, mehediRawDragRect, MehediAnnotationKind.MehediHighlight);
                     break;
 
                 case ShihabPdfToolMode.Sshihabb007Underline:
-                    sshihabb007Page.MehediAnnotations.Add(new ShihabPdfAnnotationItem
-                    {
-                        MehediPageIndex = sshihabb007ActivePageIndex,
-                        Sshihabb007Kind = MehediAnnotationKind.Sshihabb007Underline,
-                        ShihabBoundsPt = mehediDragRect,
-                        Sshihabb007StrokeColor = Color.FromArgb(255, 16, 185, 129)
-                    });
+                    ApplyShihabSmartDragMarkup(sshihabb007Page, mehediRawDragRect, MehediAnnotationKind.Sshihabb007Underline);
                     break;
 
                 case ShihabPdfToolMode.ShihabStrikeout:
-                    sshihabb007Page.MehediAnnotations.Add(new ShihabPdfAnnotationItem
-                    {
-                        MehediPageIndex = sshihabb007ActivePageIndex,
-                        Sshihabb007Kind = MehediAnnotationKind.ShihabStrikeout,
-                        ShihabBoundsPt = mehediDragRect,
-                        Sshihabb007StrokeColor = Color.FromArgb(255, 239, 68, 68)
-                    });
+                    ApplyShihabSmartDragMarkup(sshihabb007Page, mehediRawDragRect, MehediAnnotationKind.ShihabStrikeout);
                     break;
 
                 case ShihabPdfToolMode.MehediStickyNote:
@@ -1976,11 +2795,12 @@ namespace ShihabMehediPdfPro
                     {
                         MehediPageIndex = sshihabb007ActivePageIndex,
                         Sshihabb007Kind = MehediAnnotationKind.MehediStickyNote,
-                        ShihabBoundsPt = new RectangleF(mehediMouseDownPt.X, mehediMouseDownPt.Y, 175f, 44f),
+                        ShihabBoundsPt = new RectangleF(mehediMouseDownPt.X, mehediMouseDownPt.Y, 185f, 44f),
                         Sshihabb007TextContent = "📌 Note — Mehedi Hasan Shihab",
                         Sshihabb007StrokeColor = Color.FromArgb(255, 217, 119, 6),
-                        ShihabFillColor = Color.FromArgb(225, 254, 243, 199)
+                        ShihabFillColor = Color.FromArgb(230, 254, 243, 199)
                     });
+                    mehediSelectedAnnotationIdx = sshihabb007Page.MehediAnnotations.Count - 1;
                     break;
 
                 case ShihabPdfToolMode.Sshihabb007FreehandInk:
@@ -1993,6 +2813,7 @@ namespace ShihabMehediPdfPro
                         Sshihabb007StrokeColor = Color.FromArgb(255, 132, 34, 166),
                         MehediStrokeWidth = 2.4f
                     });
+                    mehediSelectedAnnotationIdx = sshihabb007Page.MehediAnnotations.Count - 1;
                     break;
 
                 case ShihabPdfToolMode.ShihabRectangleShape:
@@ -2004,6 +2825,7 @@ namespace ShihabMehediPdfPro
                         Sshihabb007StrokeColor = Color.FromArgb(255, 132, 34, 166),
                         ShihabFillColor = Color.FromArgb(28, 132, 34, 166)
                     });
+                    mehediSelectedAnnotationIdx = sshihabb007Page.MehediAnnotations.Count - 1;
                     break;
 
                 case ShihabPdfToolMode.MehediEllipseShape:
@@ -2015,6 +2837,7 @@ namespace ShihabMehediPdfPro
                         Sshihabb007StrokeColor = Color.FromArgb(255, 132, 34, 166),
                         ShihabFillColor = Color.FromArgb(28, 132, 34, 166)
                     });
+                    mehediSelectedAnnotationIdx = sshihabb007Page.MehediAnnotations.Count - 1;
                     break;
 
                 case ShihabPdfToolMode.Sshihabb007ArrowLine:
@@ -2026,6 +2849,7 @@ namespace ShihabMehediPdfPro
                         Sshihabb007StrokeColor = Color.FromArgb(255, 239, 68, 68),
                         MehediStrokeWidth = 2.2f
                     });
+                    mehediSelectedAnnotationIdx = sshihabb007Page.MehediAnnotations.Count - 1;
                     break;
 
                 case ShihabPdfToolMode.ShihabCalloutBox:
@@ -2038,6 +2862,7 @@ namespace ShihabMehediPdfPro
                         Sshihabb007StrokeColor = Color.FromArgb(255, 224, 86, 36),
                         ShihabFillColor = Color.FromArgb(230, 255, 247, 237)
                     });
+                    mehediSelectedAnnotationIdx = sshihabb007Page.MehediAnnotations.Count - 1;
                     break;
 
                 case ShihabPdfToolMode.MehediRedactionMark:
@@ -2049,6 +2874,7 @@ namespace ShihabMehediPdfPro
                         Sshihabb007TextContent = "Redaction Target",
                         Sshihabb007IsRedactionBurned = false
                     });
+                    mehediSelectedAnnotationIdx = sshihabb007Page.MehediAnnotations.Count - 1;
                     break;
 
                 case ShihabPdfToolMode.ShihabStampApproved:
@@ -2061,6 +2887,7 @@ namespace ShihabMehediPdfPro
                         Sshihabb007StrokeColor = Color.FromArgb(255, 16, 185, 129),
                         ShihabFillColor = Color.FromArgb(38, 16, 185, 129)
                     });
+                    mehediSelectedAnnotationIdx = sshihabb007Page.MehediAnnotations.Count - 1;
                     break;
 
                 case ShihabPdfToolMode.Sshihabb007SignatureStamp:
@@ -2079,6 +2906,7 @@ namespace ShihabMehediPdfPro
                         Sshihabb007StrokeColor = Color.FromArgb(255, 14, 165, 233),
                         ShihabFillColor = Color.FromArgb(30, 14, 165, 233)
                     });
+                    mehediSelectedAnnotationIdx = sshihabb007Page.MehediAnnotations.Count - 1;
                     break;
 
                 case ShihabPdfToolMode.ShihabFormTextField:
@@ -2105,6 +2933,132 @@ namespace ShihabMehediPdfPro
             if (shihabIsLeftDrawerExpanded) RefreshMehediLeftNavigationDock();
         }
 
+        private void ApplyShihabSmartDragMarkup(MehediPdfPageModel shihabPage, RectangleF mehediRawDragPt, MehediAnnotationKind sshihabb007MarkupKind)
+        {
+            RectangleF shihabQueryRect = new RectangleF(
+                mehediRawDragPt.X,
+                mehediRawDragPt.Y,
+                Math.Max(4f, mehediRawDragPt.Width),
+                Math.Max(4f, mehediRawDragPt.Height));
+
+            int mehediMatchedLines = 0;
+            for (int sshihabb007I = 0; sshihabb007I < shihabPage.ShihabTextBlocks.Count; sshihabb007I++)
+            {
+                ShihabPdfTextBlockItem shihabTb = shihabPage.ShihabTextBlocks[sshihabb007I];
+                if (shihabTb.ShihabIsDeleted) continue;
+
+                if (shihabTb.Sshihabb007BoundsPt.IntersectsWith(shihabQueryRect))
+                {
+                    // If user dragged horizontally within a single line, clip horizontally to drag span; if clicked or multi-line, mark the matched text block span
+                    float mehediLeft = shihabQueryRect.Width > 18f
+                        ? Math.Max(shihabTb.Sshihabb007BoundsPt.Left, shihabQueryRect.Left)
+                        : shihabTb.Sshihabb007BoundsPt.Left;
+                    float sshihabb007Right = shihabQueryRect.Width > 18f
+                        ? Math.Min(shihabTb.Sshihabb007BoundsPt.Right, shihabQueryRect.Right)
+                        : shihabTb.Sshihabb007BoundsPt.Right;
+                    if (sshihabb007Right - mehediLeft < 12f)
+                    {
+                        mehediLeft = shihabTb.Sshihabb007BoundsPt.Left;
+                        sshihabb007Right = shihabTb.Sshihabb007BoundsPt.Right;
+                    }
+
+                    RectangleF shihabSnappedRect = new RectangleF(
+                        mehediLeft,
+                        shihabTb.Sshihabb007BoundsPt.Top,
+                        Math.Max(16f, sshihabb007Right - mehediLeft),
+                        Math.Max(12f, shihabTb.Sshihabb007BoundsPt.Height));
+
+                    AddShihabSingleMarkupAnnotation(shihabPage, shihabSnappedRect, sshihabb007MarkupKind, shihabTb.ShihabText);
+                    mehediMatchedLines++;
+                }
+            }
+
+            if (mehediMatchedLines == 0)
+            {
+                RectangleF sshihabb007FallbackRect = new RectangleF(
+                    mehediRawDragPt.X,
+                    mehediRawDragPt.Y - (mehediRawDragPt.Height < 8f ? 7f : 0f),
+                    Math.Max(48f, mehediRawDragPt.Width),
+                    Math.Max(15f, mehediRawDragPt.Height));
+                AddShihabSingleMarkupAnnotation(shihabPage, sshihabb007FallbackRect, sshihabb007MarkupKind, sshihabb007MarkupKind.ToString());
+            }
+        }
+
+        private void ApplyShihabMarkupToSelectedTextBlocks(MehediAnnotationKind shihabMarkupKind)
+        {
+            if (ShihabActiveDoc == null) return;
+            MehediPdfPageModel mehediPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+
+            if (mehediMultiSelectedTextBlockIndices.Count == 0 && sshihabb007SelectedTextBlockIdx >= 0)
+            {
+                mehediMultiSelectedTextBlockIndices.Add(sshihabb007SelectedTextBlockIdx);
+            }
+
+            foreach (int sshihabb007Idx in mehediMultiSelectedTextBlockIndices)
+            {
+                if (sshihabb007Idx >= 0 && sshihabb007Idx < mehediPage.ShihabTextBlocks.Count)
+                {
+                    ShihabPdfTextBlockItem shihabTb = mehediPage.ShihabTextBlocks[sshihabb007Idx];
+                    if (!shihabTb.ShihabIsDeleted)
+                    {
+                        AddShihabSingleMarkupAnnotation(mehediPage, shihabTb.Sshihabb007BoundsPt, shihabMarkupKind, shihabTb.ShihabText);
+                    }
+                }
+            }
+
+            shihabFloatingSelectionMenuPanel.Visible = false;
+            ShihabActiveDoc.ShihabIsModifiedDirty = true;
+            RenderActiveShihabPageToCanvas();
+            if (shihabIsLeftDrawerExpanded) RefreshMehediLeftNavigationDock();
+        }
+
+        private void AddShihabSingleMarkupAnnotation(MehediPdfPageModel shihabPage, RectangleF mehediBoundsPt, MehediAnnotationKind sshihabb007Kind, string shihabContent)
+        {
+            Color mehediStroke = sshihabb007Kind == MehediAnnotationKind.Sshihabb007Underline
+                ? Color.FromArgb(255, 16, 185, 129)
+                : (sshihabb007Kind == MehediAnnotationKind.ShihabStrikeout
+                    ? Color.FromArgb(255, 239, 68, 68)
+                    : Color.FromArgb(255, 250, 204, 21));
+
+            shihabPage.MehediAnnotations.Add(new ShihabPdfAnnotationItem
+            {
+                MehediPageIndex = sshihabb007ActivePageIndex,
+                Sshihabb007Kind = sshihabb007Kind,
+                ShihabBoundsPt = mehediBoundsPt,
+                Sshihabb007TextContent = shihabContent ?? sshihabb007Kind.ToString(),
+                Sshihabb007StrokeColor = mehediStroke,
+                ShihabFillColor = Color.FromArgb(95, 255, 235, 59)
+            });
+            mehediSelectedAnnotationIdx = shihabPage.MehediAnnotations.Count - 1;
+        }
+
+        private void CopyShihabSelectedTextToClipboard()
+        {
+            if (ShihabActiveDoc == null) return;
+            MehediPdfPageModel shihabPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            List<string> mehediLines = new List<string>();
+
+            List<int> sshihabb007Sorted = new List<int>(mehediMultiSelectedTextBlockIndices);
+            sshihabb007Sorted.Sort();
+            foreach (int shihabIdx in sshihabb007Sorted)
+            {
+                if (shihabIdx >= 0 && shihabIdx < shihabPage.ShihabTextBlocks.Count && !shihabPage.ShihabTextBlocks[shihabIdx].ShihabIsDeleted)
+                {
+                    mehediLines.Add(shihabPage.ShihabTextBlocks[shihabIdx].ShihabText);
+                }
+            }
+            if (mehediLines.Count == 0 && sshihabb007SelectedTextBlockIdx >= 0 && sshihabb007SelectedTextBlockIdx < shihabPage.ShihabTextBlocks.Count)
+            {
+                mehediLines.Add(shihabPage.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx].ShihabText);
+            }
+
+            if (mehediLines.Count > 0)
+            {
+                try { Clipboard.SetText(string.Join(Environment.NewLine, mehediLines)); } catch { }
+            }
+            shihabFloatingSelectionMenuPanel.Visible = false;
+        }
+
         private void OnMehediCanvasLiveRubberbandPaint(object shihabSender, PaintEventArgs mehediE)
         {
             using (Pen sshihabb007PageBorder = new Pen(ShihabThemePalette.MehediBorderColor, 1f))
@@ -2112,7 +3066,7 @@ namespace ShihabMehediPdfPro
                 mehediE.Graphics.DrawRectangle(sshihabb007PageBorder, 0, 0, shihabPagePictureBox.Width - 1, shihabPagePictureBox.Height - 1);
             }
 
-            if (!shihabIsMouseDragging || mehediCurrentTool == ShihabPdfToolMode.ShihabHandPan) return;
+            if (!shihabIsMouseDragging || (mehediActiveDragSubMode != 0 && mehediActiveDragSubMode != 6)) return;
 
             RectangleF shihabDragPx = new RectangleF(
                 Math.Min(mehediMouseDownPt.X, sshihabb007MouseCurrentPt.X) * shihabZoomScale,
@@ -2120,15 +3074,237 @@ namespace ShihabMehediPdfPro
                 Math.Abs(sshihabb007MouseCurrentPt.X - mehediMouseDownPt.X) * shihabZoomScale,
                 Math.Abs(sshihabb007MouseCurrentPt.Y - mehediMouseDownPt.Y) * shihabZoomScale);
 
-            using (Pen mehediRubberPen = new Pen(ShihabThemePalette.ShihabPrimaryAccent, 1.8f) { DashStyle = DashStyle.Dash })
+            if (mehediActiveDragSubMode == 6)
             {
-                mehediE.Graphics.DrawRectangle(mehediRubberPen, shihabDragPx.X, shihabDragPx.Y, shihabDragPx.Width, shihabDragPx.Height);
+                using (SolidBrush mehediSelFill = new SolidBrush(Color.FromArgb(40, 0, 120, 215)))
+                using (Pen sshihabb007SelPen = new Pen(Color.FromArgb(200, 0, 120, 215), 1.2f))
+                {
+                    mehediE.Graphics.FillRectangle(mehediSelFill, shihabDragPx);
+                    mehediE.Graphics.DrawRectangle(sshihabb007SelPen, shihabDragPx.X, shihabDragPx.Y, shihabDragPx.Width, shihabDragPx.Height);
+                }
+            }
+            else
+            {
+                using (Pen mehediRubberPen = new Pen(ShihabThemePalette.ShihabPrimaryAccent, 1.8f) { DashStyle = DashStyle.Dash })
+                {
+                    mehediE.Graphics.DrawRectangle(mehediRubberPen, shihabDragPx.X, shihabDragPx.Y, shihabDragPx.Width, shihabDragPx.Height);
+                }
             }
         }
 
         private void OnShihabCanvasDoubleClick(object shihabSender, EventArgs mehediE)
         {
-            EditSelectedShihabTextBlockModal();
+            if (ShihabActiveDoc == null) return;
+            MehediPdfPageModel shihabPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            int mehediHitText = FindShihabTextBlockAtPoint(shihabPage, mehediMouseDownPt);
+            if (mehediHitText >= 0)
+            {
+                BeginShihabInlineTextBlockEdit(mehediHitText);
+                return;
+            }
+
+            int sshihabb007HitAnnot = FindShihabAnnotationAtPoint(shihabPage, mehediMouseDownPt);
+            if (sshihabb007HitAnnot >= 0)
+            {
+                BeginShihabInlineAnnotationEdit(sshihabb007HitAnnot);
+                return;
+            }
+
+            CreateAndBeginInlineShihabTextAtPoint(mehediMouseDownPt);
+        }
+
+        // =====================================================================
+        // FORMATTING, DUPLICATION & DELETION OF TEXT BLOCKS & OBJECTS
+        // =====================================================================
+        private void ApplyShihabFontFamilyToSelection(string shihabFontName)
+        {
+            if (ShihabActiveDoc == null || string.IsNullOrWhiteSpace(shihabFontName)) return;
+            MehediPdfPageModel mehediPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            if (sshihabb007SelectedTextBlockIdx >= 0 && sshihabb007SelectedTextBlockIdx < mehediPage.ShihabTextBlocks.Count)
+            {
+                mehediPage.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx].Sshihabb007FontName = shihabFontName;
+                mehediPage.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx].MehediIsModified = true;
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RenderActiveShihabPageToCanvas();
+            }
+            else if (mehediSelectedAnnotationIdx >= 0 && mehediSelectedAnnotationIdx < mehediPage.MehediAnnotations.Count)
+            {
+                mehediPage.MehediAnnotations[mehediSelectedAnnotationIdx].ShihabFontFamily = shihabFontName;
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RenderActiveShihabPageToCanvas();
+            }
+        }
+
+        private void AdjustShihabSelectedFontSize(float mehediDeltaPt)
+        {
+            if (ShihabActiveDoc == null) return;
+            MehediPdfPageModel shihabPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            if (sshihabb007SelectedTextBlockIdx >= 0 && sshihabb007SelectedTextBlockIdx < shihabPage.ShihabTextBlocks.Count)
+            {
+                ShihabPdfTextBlockItem sshihabb007Tb = shihabPage.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx];
+                sshihabb007Tb.ShihabFontSizePt = Math.Max(7f, Math.Min(48f, sshihabb007Tb.ShihabFontSizePt + mehediDeltaPt));
+                sshihabb007Tb.MehediIsModified = true;
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RenderActiveShihabPageToCanvas();
+            }
+            else if (mehediSelectedAnnotationIdx >= 0 && mehediSelectedAnnotationIdx < shihabPage.MehediAnnotations.Count)
+            {
+                ShihabPdfAnnotationItem shihabAn = shihabPage.MehediAnnotations[mehediSelectedAnnotationIdx];
+                shihabAn.Sshihabb007FontSizePt = Math.Max(7f, Math.Min(48f, shihabAn.Sshihabb007FontSizePt + mehediDeltaPt));
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RenderActiveShihabPageToCanvas();
+            }
+        }
+
+        private void ToggleShihabSelectedBold()
+        {
+            if (ShihabActiveDoc == null) return;
+            MehediPdfPageModel shihabPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            if (sshihabb007SelectedTextBlockIdx >= 0 && sshihabb007SelectedTextBlockIdx < shihabPage.ShihabTextBlocks.Count)
+            {
+                ShihabPdfTextBlockItem mehediTb = shihabPage.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx];
+                mehediTb.Sshihabb007IsBold = !mehediTb.Sshihabb007IsBold;
+                mehediTb.MehediIsModified = true;
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RenderActiveShihabPageToCanvas();
+            }
+        }
+
+        private void ToggleShihabSelectedItalic()
+        {
+            if (ShihabActiveDoc == null) return;
+            MehediPdfPageModel shihabPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            if (sshihabb007SelectedTextBlockIdx >= 0 && sshihabb007SelectedTextBlockIdx < shihabPage.ShihabTextBlocks.Count)
+            {
+                ShihabPdfTextBlockItem mehediTb = shihabPage.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx];
+                mehediTb.ShihabIsItalic = !mehediTb.ShihabIsItalic;
+                mehediTb.MehediIsModified = true;
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RenderActiveShihabPageToCanvas();
+            }
+        }
+
+        private void ApplyShihabColorToSelection(Color shihabColor)
+        {
+            if (ShihabActiveDoc == null) return;
+            MehediPdfPageModel mehediPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            if (sshihabb007SelectedTextBlockIdx >= 0 && sshihabb007SelectedTextBlockIdx < mehediPage.ShihabTextBlocks.Count)
+            {
+                ShihabPdfTextBlockItem sshihabb007Tb = mehediPage.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx];
+                sshihabb007Tb.MehediTextColor = shihabColor;
+                sshihabb007Tb.MehediIsModified = true;
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RenderActiveShihabPageToCanvas();
+            }
+            else if (mehediSelectedAnnotationIdx >= 0 && mehediSelectedAnnotationIdx < mehediPage.MehediAnnotations.Count)
+            {
+                ShihabPdfAnnotationItem shihabAn = mehediPage.MehediAnnotations[mehediSelectedAnnotationIdx];
+                shihabAn.Sshihabb007StrokeColor = shihabColor;
+                shihabAn.ShihabFillColor = Color.FromArgb(45, shihabColor.R, shihabColor.G, shihabColor.B);
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RenderActiveShihabPageToCanvas();
+            }
+        }
+
+        private void DuplicateShihabSelectedObjectOrText()
+        {
+            if (ShihabActiveDoc == null) return;
+            MehediPdfPageModel shihabPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            if (mehediSelectedAnnotationIdx >= 0 && mehediSelectedAnnotationIdx < shihabPage.MehediAnnotations.Count)
+            {
+                ShihabPdfAnnotationItem mehediClone = shihabPage.MehediAnnotations[mehediSelectedAnnotationIdx].CloneForShihabUndo();
+                mehediClone.ShihabBoundsPt = new RectangleF(mehediClone.ShihabBoundsPt.X + 18f, mehediClone.ShihabBoundsPt.Y + 18f, mehediClone.ShihabBoundsPt.Width, mehediClone.ShihabBoundsPt.Height);
+                mehediClone.MehediSourceCutoutBoundsPt = RectangleF.Empty;
+                shihabPage.MehediAnnotations.Add(mehediClone);
+                mehediSelectedAnnotationIdx = shihabPage.MehediAnnotations.Count - 1;
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RenderActiveShihabPageToCanvas();
+            }
+            else if (sshihabb007SelectedTextBlockIdx >= 0 && sshihabb007SelectedTextBlockIdx < shihabPage.ShihabTextBlocks.Count)
+            {
+                ShihabPdfTextBlockItem sshihabb007Src = shihabPage.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx];
+                ShihabPdfTextBlockItem shihabCopy = new ShihabPdfTextBlockItem
+                {
+                    MehediPageIndex = sshihabb007ActivePageIndex,
+                    Sshihabb007BoundsPt = new RectangleF(sshihabb007Src.Sshihabb007BoundsPt.X + 14f, sshihabb007Src.Sshihabb007BoundsPt.Y + 18f, sshihabb007Src.Sshihabb007BoundsPt.Width, sshihabb007Src.Sshihabb007BoundsPt.Height),
+                    MehediOriginalBoundsPt = RectangleF.Empty,
+                    ShihabText = sshihabb007Src.ShihabText,
+                    MehediOriginalText = string.Empty,
+                    Sshihabb007FontName = sshihabb007Src.Sshihabb007FontName,
+                    ShihabFontSizePt = sshihabb007Src.ShihabFontSizePt,
+                    MehediTextColor = sshihabb007Src.MehediTextColor,
+                    Sshihabb007BackgroundMaskColor = sshihabb007Src.Sshihabb007BackgroundMaskColor,
+                    Sshihabb007IsBold = sshihabb007Src.Sshihabb007IsBold,
+                    ShihabIsItalic = sshihabb007Src.ShihabIsItalic,
+                    MehediIsModified = true
+                };
+                shihabPage.ShihabTextBlocks.Add(shihabCopy);
+                sshihabb007SelectedTextBlockIdx = shihabPage.ShihabTextBlocks.Count - 1;
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RenderActiveShihabPageToCanvas();
+            }
+        }
+
+        private void JoinOrInlineEditShihabSelectedTextBlocks()
+        {
+            if (ShihabActiveDoc == null) return;
+            MehediPdfPageModel shihabPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            if (mehediMultiSelectedTextBlockIndices.Count > 1)
+            {
+                List<int> mehediSorted = new List<int>(mehediMultiSelectedTextBlockIndices);
+                mehediSorted.Sort();
+                int sshihabb007PrimaryIdx = mehediSorted[0];
+                ShihabPdfTextBlockItem shihabPrimary = shihabPage.ShihabTextBlocks[sshihabb007PrimaryIdx];
+                StringBuilder mehediJoinedText = new StringBuilder(shihabPrimary.ShihabText);
+                float sshihabb007MaxRight = shihabPrimary.Sshihabb007BoundsPt.Right;
+
+                for (int shihabI = 1; shihabI < mehediSorted.Count; shihabI++)
+                {
+                    ShihabPdfTextBlockItem mehediOther = shihabPage.ShihabTextBlocks[mehediSorted[shihabI]];
+                    mehediJoinedText.Append(" ").Append(mehediOther.ShihabText);
+                    if (mehediOther.Sshihabb007BoundsPt.Right > sshihabb007MaxRight)
+                        sshihabb007MaxRight = mehediOther.Sshihabb007BoundsPt.Right;
+                    mehediOther.ShihabIsDeleted = true;
+                    mehediOther.MehediIsModified = true;
+                }
+
+                shihabPrimary.ShihabText = mehediJoinedText.ToString();
+                shihabPrimary.MehediIsModified = true;
+                shihabPrimary.Sshihabb007BoundsPt = new RectangleF(
+                    shihabPrimary.Sshihabb007BoundsPt.X,
+                    shihabPrimary.Sshihabb007BoundsPt.Y,
+                    Math.Max(shihabPrimary.Sshihabb007BoundsPt.Width, sshihabb007MaxRight - shihabPrimary.Sshihabb007BoundsPt.X),
+                    shihabPrimary.Sshihabb007BoundsPt.Height);
+
+                mehediMultiSelectedTextBlockIndices.Clear();
+                sshihabb007SelectedTextBlockIdx = sshihabb007PrimaryIdx;
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RenderActiveShihabPageToCanvas();
+                BeginShihabInlineTextBlockEdit(sshihabb007PrimaryIdx);
+                return;
+            }
+
+            if (sshihabb007SelectedTextBlockIdx >= 0)
+            {
+                BeginShihabInlineTextBlockEdit(sshihabb007SelectedTextBlockIdx);
+            }
+            else
+            {
+                SetShihabToolMode(ShihabPdfToolMode.Sshihabb007EditContent);
+            }
+        }
+
+        private static void RebuildShihabExtractedTextFromBlocks(MehediPdfPageModel shihabPage)
+        {
+            List<string> mehediLines = new List<string>();
+            foreach (ShihabPdfTextBlockItem sshihabb007Tb in shihabPage.ShihabTextBlocks)
+            {
+                if (!sshihabb007Tb.ShihabIsDeleted && !string.IsNullOrWhiteSpace(sshihabb007Tb.ShihabText))
+                {
+                    mehediLines.Add(sshihabb007Tb.ShihabText);
+                }
+            }
+            shihabPage.ShihabExtractedText = string.Join(Environment.NewLine, mehediLines);
         }
 
         // =====================================================================
@@ -2143,6 +3319,9 @@ namespace ShihabMehediPdfPro
                 shihabOpenDocuments.Add(sshihabb007Loaded);
                 mehediActiveDocIndex = shihabOpenDocuments.Count - 1;
                 sshihabb007ActivePageIndex = 0;
+                mehediSelectedAnnotationIdx = -1;
+                sshihabb007SelectedTextBlockIdx = -1;
+                mehediMultiSelectedTextBlockIndices.Clear();
 
                 if (!mehediDiscoveredLocalPdfFiles.Contains(mehediFilePath))
                 {
@@ -2249,8 +3428,26 @@ namespace ShihabMehediPdfPro
             if (shihabPg.MehediAnnotations.Count > 0)
             {
                 shihabPg.MehediAnnotations.RemoveAt(shihabPg.MehediAnnotations.Count - 1);
+                mehediSelectedAnnotationIdx = -1;
                 ShihabActiveDoc.ShihabIsModifiedDirty = true;
                 RenderActiveShihabPageToCanvas();
+                return;
+            }
+
+            // Or restore the most recently modified/deleted text block on this page
+            for (int mehediI = shihabPg.ShihabTextBlocks.Count - 1; mehediI >= 0; mehediI--)
+            {
+                ShihabPdfTextBlockItem sshihabb007Tb = shihabPg.ShihabTextBlocks[mehediI];
+                if (sshihabb007Tb.MehediIsModified || sshihabb007Tb.ShihabIsDeleted)
+                {
+                    sshihabb007Tb.ShihabText = sshihabb007Tb.MehediOriginalText;
+                    if (!sshihabb007Tb.MehediOriginalBoundsPt.IsEmpty)
+                        sshihabb007Tb.Sshihabb007BoundsPt = sshihabb007Tb.MehediOriginalBoundsPt;
+                    sshihabb007Tb.MehediIsModified = false;
+                    sshihabb007Tb.ShihabIsDeleted = false;
+                    RenderActiveShihabPageToCanvas();
+                    return;
+                }
             }
         }
 
@@ -2258,41 +3455,74 @@ namespace ShihabMehediPdfPro
         {
             if (ShihabActiveDoc == null) return;
             MehediPdfPageModel shihabPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
-            if (shihabPage.ShihabTextBlocks.Count == 0)
-            {
-                // Run quick OCR on page if it came from a raster/compressed stream with no text blocks yet
-                int mehediWords;
-                ShihabWinRtRenderAndOcrEngine.RunMehediWinRtOcrOnPage(ShihabActiveDoc, sshihabb007ActivePageIndex, out mehediWords);
-            }
             if (sshihabb007SelectedTextBlockIdx < 0 && shihabPage.ShihabTextBlocks.Count > 0)
             {
                 sshihabb007SelectedTextBlockIdx = 0;
             }
             if (sshihabb007SelectedTextBlockIdx >= 0 && sshihabb007SelectedTextBlockIdx < shihabPage.ShihabTextBlocks.Count)
             {
-                sshihabb007PluginLoader.TriggerShihabPluginOnDemand("MehediPageEditor");
-                ShihabPdfTextBlockItem mehediBlock = shihabPage.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx];
-                if (ShihabDialogsAndToolsWindows.ShowShihabTextBlockEditorDialog(this, mehediBlock))
-                {
-                    List<string> sshihabb007Lines = new List<string>();
-                    foreach (ShihabPdfTextBlockItem shihabTb in shihabPage.ShihabTextBlocks)
-                        sshihabb007Lines.Add(shihabTb.ShihabText);
-                    shihabPage.ShihabExtractedText = string.Join(Environment.NewLine, sshihabb007Lines);
-                    ShihabActiveDoc.ShihabIsModifiedDirty = true;
-                    ShihabWinRtRenderAndOcrEngine.InvalidateShihabDocumentCache(ShihabActiveDoc.ShihabDocumentId);
-                    RefreshAllShihabWorkstationPanels();
-                }
+                BeginShihabInlineTextBlockEdit(sshihabb007SelectedTextBlockIdx);
             }
         }
 
         private void DeleteSelectedShihabAnnotation()
         {
+            DeleteSelectedShihabAnnotationOrTextBlock();
+        }
+
+        private void DeleteSelectedShihabAnnotationOrTextBlock()
+        {
             if (ShihabActiveDoc == null) return;
             MehediPdfPageModel shihabPage = ShihabActiveDoc.Sshihabb007Pages[sshihabb007ActivePageIndex];
+            shihabFloatingSelectionMenuPanel.Visible = false;
+
             if (mehediSelectedAnnotationIdx >= 0 && mehediSelectedAnnotationIdx < shihabPage.MehediAnnotations.Count)
             {
-                shihabPage.MehediAnnotations.RemoveAt(mehediSelectedAnnotationIdx);
+                ShihabPdfAnnotationItem mehediTargetAnnot = shihabPage.MehediAnnotations[mehediSelectedAnnotationIdx];
+                if (!mehediTargetAnnot.MehediSourceCutoutBoundsPt.IsEmpty)
+                {
+                    // If this was a cutout object from the base PDF page, replace its cutout with a white mask rectangle so deleting the object erases it from the page!
+                    mehediTargetAnnot.Sshihabb007Kind = MehediAnnotationKind.ShihabRectangle;
+                    mehediTargetAnnot.ShihabBoundsPt = mehediTargetAnnot.MehediSourceCutoutBoundsPt;
+                    mehediTargetAnnot.ShihabFillColor = shihabPage.Sshihabb007PaperBackgroundColor;
+                    mehediTargetAnnot.Sshihabb007StrokeColor = shihabPage.Sshihabb007PaperBackgroundColor;
+                    mehediTargetAnnot.Sshihabb007TextContent = string.Empty;
+                    mehediTargetAnnot.Sshihabb007EmbeddedImageBytes = null;
+                }
+                else
+                {
+                    shihabPage.MehediAnnotations.RemoveAt(mehediSelectedAnnotationIdx);
+                }
                 mehediSelectedAnnotationIdx = -1;
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RefreshAllShihabWorkstationPanels();
+                return;
+            }
+
+            if (mehediMultiSelectedTextBlockIndices.Count > 0)
+            {
+                foreach (int sshihabb007Idx in mehediMultiSelectedTextBlockIndices)
+                {
+                    if (sshihabb007Idx >= 0 && sshihabb007Idx < shihabPage.ShihabTextBlocks.Count)
+                    {
+                        shihabPage.ShihabTextBlocks[sshihabb007Idx].ShihabIsDeleted = true;
+                        shihabPage.ShihabTextBlocks[sshihabb007Idx].MehediIsModified = true;
+                    }
+                }
+                mehediMultiSelectedTextBlockIndices.Clear();
+                sshihabb007SelectedTextBlockIdx = -1;
+                RebuildShihabExtractedTextFromBlocks(shihabPage);
+                ShihabActiveDoc.ShihabIsModifiedDirty = true;
+                RefreshAllShihabWorkstationPanels();
+                return;
+            }
+
+            if (sshihabb007SelectedTextBlockIdx >= 0 && sshihabb007SelectedTextBlockIdx < shihabPage.ShihabTextBlocks.Count)
+            {
+                shihabPage.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx].ShihabIsDeleted = true;
+                shihabPage.ShihabTextBlocks[sshihabb007SelectedTextBlockIdx].MehediIsModified = true;
+                sshihabb007SelectedTextBlockIdx = -1;
+                RebuildShihabExtractedTextFromBlocks(shihabPage);
                 ShihabActiveDoc.ShihabIsModifiedDirty = true;
                 RefreshAllShihabWorkstationPanels();
             }
@@ -2300,9 +3530,17 @@ namespace ShihabMehediPdfPro
 
         private void SetShihabToolMode(ShihabPdfToolMode mehediNewTool)
         {
+            if (sshihabb007InlineCanvasTextEditor != null && sshihabb007InlineCanvasTextEditor.Visible)
+            {
+                CommitShihabInlineCanvasTextEdit();
+            }
             this.mehediCurrentTool = mehediNewTool;
-            shihabPagePictureBox.Cursor = (mehediNewTool == ShihabPdfToolMode.ShihabHandPan) ? Cursors.Hand : Cursors.Cross;
+            shihabFloatingSelectionMenuPanel.Visible = false;
+            shihabPagePictureBox.Cursor = (mehediNewTool == ShihabPdfToolMode.ShihabHandPan)
+                ? Cursors.Hand
+                : (mehediNewTool == ShihabPdfToolMode.MehediSelectText || mehediNewTool == ShihabPdfToolMode.Sshihabb007EditContent ? Cursors.IBeam : Cursors.Cross);
             RebuildShihabRibbonButtonsForActiveTab();
+            RenderActiveShihabPageToCanvas();
             UpdateShihabStatusBar();
         }
 
@@ -2775,6 +4013,17 @@ namespace ShihabMehediPdfPro
 
         private void OnShihabGlobalShortcutKeyDown(object shihabSender, KeyEventArgs mehediE)
         {
+            if (sshihabb007InlineCanvasTextEditor != null && sshihabb007InlineCanvasTextEditor.Visible && sshihabb007InlineCanvasTextEditor.Focused)
+            {
+                return;
+            }
+            if (mehediTopSearchInputBox.Focused || sshihabb007PageNumberInputBox.Focused ||
+                (mehediAiQuestionInputBox != null && mehediAiQuestionInputBox.Focused) ||
+                (shihabFxjseCommandInputBox != null && shihabFxjseCommandInputBox.Focused))
+            {
+                return;
+            }
+
             if (mehediE.Control && mehediE.KeyCode == Keys.O)
             {
                 mehediE.SuppressKeyPress = true;
@@ -2785,24 +4034,41 @@ namespace ShihabMehediPdfPro
                 mehediE.SuppressKeyPress = true;
                 SaveCurrentShihabDocument();
             }
+            else if (mehediE.Control && mehediE.KeyCode == Keys.C)
+            {
+                mehediE.SuppressKeyPress = true;
+                CopyShihabSelectedTextToClipboard();
+            }
+            else if (mehediE.Control && mehediE.KeyCode == Keys.D)
+            {
+                mehediE.SuppressKeyPress = true;
+                DuplicateShihabSelectedObjectOrText();
+            }
+            else if (mehediE.Control && mehediE.KeyCode == Keys.Z)
+            {
+                mehediE.SuppressKeyPress = true;
+                UndoLastShihabAnnotationOnPage();
+            }
             else if (mehediE.KeyCode == Keys.PageDown || mehediE.KeyCode == Keys.Right)
             {
-                if (!mehediTopSearchInputBox.Focused && !sshihabb007PageNumberInputBox.Focused)
-                    NavigateShihabPage(1);
+                NavigateShihabPage(1);
             }
             else if (mehediE.KeyCode == Keys.PageUp || mehediE.KeyCode == Keys.Left)
             {
-                if (!mehediTopSearchInputBox.Focused && !sshihabb007PageNumberInputBox.Focused)
-                    NavigateShihabPage(-1);
+                NavigateShihabPage(-1);
             }
-            else if (mehediE.KeyCode == Keys.Delete)
+            else if (mehediE.KeyCode == Keys.Delete || mehediE.KeyCode == Keys.Back)
             {
-                DeleteSelectedShihabAnnotation();
+                DeleteSelectedShihabAnnotationOrTextBlock();
             }
-            else if (mehediE.KeyCode == Keys.Escape && shihabIsBackstageVisible)
+            else if (mehediE.KeyCode == Keys.Escape)
             {
-                SetShihabBackstageVisibility(false);
-                RebuildShihabRibbonTabStrip();
+                shihabFloatingSelectionMenuPanel.Visible = false;
+                if (shihabIsBackstageVisible)
+                {
+                    SetShihabBackstageVisibility(false);
+                    RebuildShihabRibbonTabStrip();
+                }
             }
         }
     }

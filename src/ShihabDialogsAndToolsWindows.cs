@@ -516,6 +516,134 @@ namespace ShihabMehediPdfPro
                 }
             }
         }
+
+        // =====================================================================
+        // 6. INTERACTIVE SEARCH & REPLACE STUDIO (Edit -> Search & Replace)
+        // =====================================================================
+        public static void ShowShihabSearchAndReplaceStudio(
+            IWin32Window shihabOwner,
+            ShihabPdfDocumentModel mehediDoc,
+            int sshihabb007ActivePageIdx,
+            Action shihabOnUpdated)
+        {
+            if (mehediDoc == null) return;
+            using (Form shihabDlg = new Form())
+            {
+                shihabDlg.Text = "Search & Replace PDF Text — PDF PRO 14.0.4 (Mehedi Hasan Shihab @sshihabb007)";
+                shihabDlg.Size = new Size(540, 260);
+                shihabDlg.StartPosition = FormStartPosition.CenterParent;
+                shihabDlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+                shihabDlg.MaximizeBox = false;
+                shihabDlg.MinimizeBox = false;
+                shihabDlg.BackColor = ShihabThemePalette.MehediWindowBg;
+                shihabDlg.ForeColor = ShihabThemePalette.Sshihabb007TextPrimary;
+
+                Label mehediFindLbl = new Label { Text = "Find text on page:", Location = new Point(18, 22), AutoSize = true, Font = new Font("Segoe UI", 9.2f, FontStyle.Bold) };
+                TextBox sshihabb007FindBox = new TextBox
+                {
+                    Location = new Point(155, 19),
+                    Size = new Size(345, 25),
+                    BackColor = ShihabThemePalette.ShihabPanelBg,
+                    ForeColor = ShihabThemePalette.Sshihabb007TextPrimary,
+                    BorderStyle = BorderStyle.FixedSingle,
+                    Font = new Font("Segoe UI", 9.5f)
+                };
+
+                Label shihabRepLbl = new Label { Text = "Replace with:", Location = new Point(18, 62), AutoSize = true, Font = new Font("Segoe UI", 9.2f, FontStyle.Bold) };
+                TextBox mehediRepBox = new TextBox
+                {
+                    Location = new Point(155, 59),
+                    Size = new Size(345, 25),
+                    BackColor = ShihabThemePalette.ShihabPanelBg,
+                    ForeColor = ShihabThemePalette.Sshihabb007TextPrimary,
+                    BorderStyle = BorderStyle.FixedSingle,
+                    Font = new Font("Segoe UI", 9.5f)
+                };
+
+                CheckBox sshihabb007AllPagesChk = new CheckBox
+                {
+                    Text = "Replace across all pages in document",
+                    Location = new Point(155, 98),
+                    AutoSize = true,
+                    Checked = false
+                };
+
+                Label shihabStatusLbl = new Label
+                {
+                    Text = "Ready to search and replace editable PDF text blocks.",
+                    Location = new Point(18, 132),
+                    AutoSize = true,
+                    ForeColor = ShihabThemePalette.ShihabTextSecondary
+                };
+
+                Button mehediReplaceBtn = new Button
+                {
+                    Text = "Replace Text",
+                    Location = new Point(155, 166),
+                    Size = new Size(150, 36),
+                    BackColor = ShihabThemePalette.ShihabPrimaryAccent,
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Segoe UI", 9.2f, FontStyle.Bold)
+                };
+                mehediReplaceBtn.FlatAppearance.BorderSize = 0;
+                mehediReplaceBtn.Click += (s, e) =>
+                {
+                    string sshihabb007Needle = sshihabb007FindBox.Text;
+                    string shihabRepl = mehediRepBox.Text ?? string.Empty;
+                    if (string.IsNullOrEmpty(sshihabb007Needle)) return;
+
+                    int mehediReplacedBlocks = 0;
+                    int sshihabb007StartPg = sshihabb007AllPagesChk.Checked ? 0 : sshihabb007ActivePageIdx;
+                    int shihabEndPg = sshihabb007AllPagesChk.Checked ? mehediDoc.Sshihabb007Pages.Count - 1 : sshihabb007ActivePageIdx;
+
+                    for (int mehediP = sshihabb007StartPg; mehediP <= shihabEndPg; mehediP++)
+                    {
+                        MehediPdfPageModel sshihabb007Pg = mehediDoc.Sshihabb007Pages[mehediP];
+                        if (!sshihabb007Pg.ShihabHasOcrLayerApplied)
+                        {
+                            using (Bitmap shihabTmp = ShihabWinRtRenderAndOcrEngine.RenderShihabCompositePage(mehediDoc, mehediP, 1.25f, -1, -1)) { }
+                        }
+                        foreach (ShihabPdfTextBlockItem mehediTb in sshihabb007Pg.ShihabTextBlocks)
+                        {
+                            if (!mehediTb.ShihabIsDeleted && !string.IsNullOrEmpty(mehediTb.ShihabText) &&
+                                mehediTb.ShihabText.IndexOf(sshihabb007Needle, StringComparison.OrdinalIgnoreCase) >= 0)
+                            {
+                                mehediTb.ShihabText = System.Text.RegularExpressions.Regex.Replace(
+                                    mehediTb.ShihabText,
+                                    System.Text.RegularExpressions.Regex.Escape(sshihabb007Needle),
+                                    shihabRepl,
+                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                                mehediTb.MehediIsModified = true;
+                                mehediReplacedBlocks++;
+                            }
+                        }
+                    }
+
+                    if (mehediReplacedBlocks > 0)
+                    {
+                        mehediDoc.ShihabIsModifiedDirty = true;
+                        if (shihabOnUpdated != null) shihabOnUpdated();
+                    }
+                    shihabStatusLbl.Text = "Updated " + mehediReplacedBlocks + " text block(s) matching '" + sshihabb007Needle + "'.";
+                };
+
+                Button sshihabb007CloseBtn = new Button
+                {
+                    Text = "Close",
+                    Location = new Point(392, 166),
+                    Size = new Size(108, 36),
+                    BackColor = ShihabThemePalette.ShihabPanelBg,
+                    ForeColor = ShihabThemePalette.Sshihabb007TextPrimary,
+                    FlatStyle = FlatStyle.Flat,
+                    DialogResult = DialogResult.Cancel
+                };
+
+                shihabDlg.Controls.AddRange(new Control[] { mehediFindLbl, sshihabb007FindBox, shihabRepLbl, mehediRepBox, sshihabb007AllPagesChk, shihabStatusLbl, mehediReplaceBtn, sshihabb007CloseBtn });
+                ShihabThemePalette.ApplyMehediDarkWindowFrame(shihabDlg.Handle, ShihabThemePalette.IsShihabDarkTheme);
+                shihabDlg.ShowDialog(shihabOwner);
+            }
+        }
     }
 }
 

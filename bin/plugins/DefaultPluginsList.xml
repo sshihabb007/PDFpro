@@ -38,3 +38,4 @@
   <PluginInfo InternalName="ShihabDocuSignPlg" DisplayName="Shihab DocuSign eSignature Connector" RealFilePath="plugins\docusign.fpi" LoadBehavior="9" LoadEventBehavior="517" Category="SecurityAndSigning" RibbonTab="Sign" Author="sshihabb007" Version="14.0.4.33508" Description="Sends active PDF documents directly through DocuSign OAuth workflows." />
   <PluginInfo InternalName="MehediUpdaterPlg" DisplayName="Mehedi Background Update &amp; Integrity Coordinator" RealFilePath="plugins\Updater.fpi" LoadBehavior="3" LoadEventBehavior="0" Category="CoreBootstrap" RibbonTab="Help" Author="Mehedi Hasan Shihab" Version="14.0.4.33508" Description="Coordinates release channel checks and Authenticode signature verification." />
 </ShihabMehediPluginsManifest>
+

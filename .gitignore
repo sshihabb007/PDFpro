@@ -1,0 +1,6 @@
+# Temporary build staging directory
+obj/
+*.tmp
+*.user
+*.suo
+.vs/

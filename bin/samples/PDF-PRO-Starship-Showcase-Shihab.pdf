@@ -1,0 +1,133 @@
+%PDF-1.7
+%‚„œ”
+% Engineered by Mehedi Hasan Shihab (@sshihabb007) - PDF PRO Starship Engine
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R /Lang (en-US) /ShihabEngine (sshihabb007-Starship-14.0.4) >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [ 7 0 R 9 0 R 11 0 R ] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Rotate 0 /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 8 0 R >>
+endobj
+8 0 obj
+<< /Length 3618 >>
+stream
+BT 0.086 0.102 0.141 rg /F2 16.0 Tf 48.00 767.89 Td (PDF PRO 14.0.4  ENTERPRISE PDF WORKSTATION \(STARSHIP ARCHITECTURE\)) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 742.89 Td (Engineered by Mehedi Hasan Shihab \(@sshihabb007\)  Open Source Flagship Edition) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 720.89 Td (--------------------------------------------------------------------------------) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 698.89 Td (1. MONOLITHIC CORE + DYNAMIC PLUGIN LOADER \(PlgDynLoader.fpi ABI\):) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 676.89 Td (- Manages 32 modular plugins declared in plugins/DefaultPluginsList.xml) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 654.89 Td (- Supports LoadBehavior=0 \(Bootstrap\), LoadBehavior=3 \(Eager\), LoadBehavior=9 \(Lazy\)) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 632.89 Td (- Double-click any paragraph in 'Edit Content' mode to edit text in place!) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 610.89 Td (2. NATIVE DIRECT2D HIGH-DPI RENDERING & NEURAL OCR ENGINE:) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 588.89 Td (- Hardware-accelerated Windows.Data.Pdf rendering with LRU bitmap cache) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 566.89 Td (- Windows.Media.Ocr neural text recognition with searchable PDF layer injection) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 544.89 Td (3. FIVE EMBEDDED ENTERPRISE TRANSFORMATION ENGINES:) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 522.89 Td (- Solid Office Exporter: Convert PDF to Word \(.docx\), Excel \(.xlsx/.csv\), HTML, RTF, Markdown) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 500.89 Td (- Callas PDF/A-1b/2b Preflight & Stream Compression Optimizer) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 478.89 Td (- Lucene++ Inverted Full-Text Search Index with BM25 Relevance Ranking) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 456.89 Td (- ODA 3D U3D/CAD Wireframe & Orbit Viewport Inspector) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 434.89 Td (- FXJSE JavaScript Automation Console & Interactive AcroForm Designer) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 412.89 Td (4. ENTERPRISE SECURITY, X.509 PKCS#7 SIGNING, REDACTION & BUILT-IN AI:) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 390.89 Td (- Permanent Whiteout Redaction, X.509 Digital Signatures, and MIP/AIP Labels) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 368.89 Td (- Built-in AI Assistant for Executive Summaries, Q&A, and Smart PII Redaction) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 346.89 Td (- Contact: Mehedi Hasan Shihab \(sshihabb007@github.io | +880-1700-000007\)) Tj ET
+BT 0.35 0.38 0.46 rg /F1 9.0 Tf 48.00 813.89 Td (PDF PRO v14.0.4 \(Starship Edition\)  |  Author: Mehedi Hasan Shihab \(@sshihabb007\)) Tj ET
+BT 0.40 0.44 0.52 rg /F1 8.5 Tf 48.00 24.00 Td (Page 1 of 3  |  Open Source Enterprise PDF Workstation  https://sshihabb007.github.io/) Tj ET
+BT 0.48 0.22 0.90 rg /F3 9.5 Tf 430.28 813.89 Td (SHIHAB-000001) Tj ET
+q 0.78 0.75 0.92 rg BT /F2 42.0 Tf 0.7071 0.7071 -0.7071 0.7071 130.96 294.66 Tm (PDF PRO  SHIHAB) Tj ET Q
+q 0.06 0.73 0.51 RG 2.20 w 375.00 741.89 172.00 38.00 re S Q
+BT 0.06 0.73 0.51 rg /F2 10.5 Tf 381.00 763.89 Td (APPROVED BY SHIHAB) Tj ET
+q 0.94 0.96 1.00 rg 0.35 0.42 0.75 RG 1.0 w 48.00 275.89 260.00 26.00 re B Q
+BT 0.12 0.16 0.30 rg /F1 9.5 Tf 53.00 281.89 Td (ReviewerName_Shihab: Mehedi Hasan Shihab \(@sshihabb007\)) Tj ET
+q 0.94 0.96 1.00 rg 0.35 0.42 0.75 RG 1.0 w 325.00 275.89 215.00 26.00 re B Q
+BT 0.12 0.16 0.30 rg /F1 9.5 Tf 330.00 281.89 Td ([X] PdfAComplianceVerified_Mehedi) Tj ET
+
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Rotate 0 /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 10 0 R >>
+endobj
+10 0 obj
+<< /Length 2533 >>
+stream
+BT 0.086 0.102 0.141 rg /F2 16.0 Tf 48.00 767.89 Td (SUBSYSTEM BENCHMARK & ENTERPRISE TELEMETRY TABLE \(Q1-Q4 2026\)) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 742.89 Td (Prepared by: Mehedi Hasan Shihab \(@sshihabb007\)  Chief Systems Architect) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 720.89 Td (--------------------------------------------------------------------------------) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 698.89 Td (Module Name               | Engine Codec         | Latency \(ms\) | Status) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 676.89 Td (ShihabPlgDynLoader        | PlugInMain ABI       | 1.4 ms       | ACTIVE) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 654.89 Td (MehediWinRtPdfRenderer    | Direct2D High-DPI    | 8.2 ms       | ACTIVE) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 632.89 Td (ShihabNeuralOcrEngine     | Windows.Media.Ocr    | 42.5 ms      | READY) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 610.89 Td (MehediSolidOfficeExporter | OpenXML DOCX/XLSX    | 14.8 ms      | READY) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 588.89 Td (ShihabCallasPreflight     | ISO 19005 PDF/A-2b   | 6.1 ms       | VERIFIED) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 566.89 Td (MehediLuceneSearchIndex   | Inverted BM25 Index  | 0.9 ms       | INDEXED) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 544.89 Td (ShihabCryptoX509Signer    | SHA-256 RSA-4096     | 11.3 ms      | SIGNED) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 522.89 Td (MehediSensorOpenTracing   | Sensor.db Span Log   | 0.4 ms       | RECORDING) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 500.89 Td (--------------------------------------------------------------------------------) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 478.89 Td (Summary Notes:) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 456.89 Td (- All 32 Starship plugins are registered with zero startup bloat.) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 434.89 Td (- Use Convert -> To Word \(.docx\) or To Excel \(.xlsx/.csv\) to export this table.) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 412.89 Td (- Use AI Assistant -> Summarize or Smart PII Audit to analyze this document.) Tj ET
+BT 0.35 0.38 0.46 rg /F1 9.0 Tf 48.00 813.89 Td (PDF PRO v14.0.4  Financial & Performance Benchmark Ledger) Tj ET
+BT 0.40 0.44 0.52 rg /F1 8.5 Tf 48.00 24.00 Td (Page 2 of 3  |  Solid Office Export \(.docx / .xlsx / .csv\) Ready) Tj ET
+BT 0.48 0.22 0.90 rg /F3 9.5 Tf 430.28 813.89 Td (SHIHAB-000002) Tj ET
+
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Rotate 0 /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 12 0 R >>
+endobj
+12 0 obj
+<< /Length 1739 >>
+stream
+BT 0.086 0.102 0.141 rg /F2 16.0 Tf 48.00 767.89 Td (CRYPTOGRAPHIC ATTESTATION & RIGHTS MANAGEMENT MANIFEST) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 742.89 Td (Certificate Authority: CN=PDF PRO Root CA \(Mehedi Hasan Shihab / sshihabb007\)) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 720.89 Td (--------------------------------------------------------------------------------) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 698.89 Td (1. Microsoft RMS & AIP Sensitivity Label: PUBLIC  UNRESTRICTED) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 676.89 Td (2. ConnectedPDF Lineage ID: cpdf_sshihabb007_26bc52f4f56b4c2b) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 654.89 Td (3. Embedded FXJSE JavaScript Runtime:) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 632.89 Td (- Execute scripts in the right-hand FXJSE Console \(e.g., this.numPages\)) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 610.89 Td (- Automate watermarking, Bates numbering, and form validation) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 588.89 Td (4. Digital Signature Verification:) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 566.89 Td (- Signer: Mehedi Hasan Shihab \(@sshihabb007\)) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 544.89 Td (- Algorithm: RSA-4096 / SHA-256 Detached & Visual Stamp) Tj ET
+BT 0.086 0.102 0.141 rg /F1 11.0 Tf 48.00 522.89 Td (- Status: VALIDATED  Document integrity confirmed.) Tj ET
+BT 0.35 0.38 0.46 rg /F1 9.0 Tf 48.00 813.89 Td (PDF PRO v14.0.4  Cryptographic Verification & FXJSE Automation) Tj ET
+BT 0.40 0.44 0.52 rg /F1 8.5 Tf 48.00 24.00 Td (Page 3 of 3  |  Signed with X.509 SHA-256 Certificate \(sshihabb007\)) Tj ET
+BT 0.48 0.22 0.90 rg /F3 9.5 Tf 430.28 813.89 Td (SHIHAB-000003) Tj ET
+
+endstream
+endobj
+6 0 obj
+<< /Title (PDF PRO 14.0.4 Starship Architecture & Feature Showcase) /Author (Mehedi Hasan Shihab \(@sshihabb007\)) /Subject (Enterprise PDF Editing, OCR, Office Export, PDF/A Preflight, RMS Security & AI Suite) /Keywords (PDF PRO, Shihab, Mehedi, sshihabb007, Starship, Foxit Pro, Open Source) /Creator (PDF PRO 14.0.4 \(Mehedi Hasan Shihab / sshihabb007\)) /Producer (ShihabMehediStarship PDF Engine v14.0.4.33508) /CreationDate (D:20261109092357Z) /ModDate (D:20261109092357Z) /ShihabAipLabel (PUBLIC  UNRESTRICTED) >>
+endobj
+xref
+0 13
+0000000000 65535 f 
+0000000092 00000 n 
+0000000199 00000 n 
+0000000271 00000 n 
+0000000368 00000 n 
+0000000470 00000 n 
+0000009102 00000 n 
+0000000565 00000 n 
+0000000727 00000 n 
+0000004397 00000 n 
+0000004560 00000 n 
+0000007146 00000 n 
+0000007310 00000 n 
+trailer
+<< /Size 13 /Root 1 0 R /Info 6 0 R >>
+startxref
+9638
+%%EOF

@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "PDF PRO — Web-to-PDF Converter (Mehedi Hasan Shihab @sshihabb007)",
+  "version": "14.0.4",
+  "description": "One-click web page to PDF PRO converter and PDF link interceptor engineered by Mehedi Hasan Shihab (@sshihabb007).",
+  "author": "Mehedi Hasan Shihab (sshihabb007)",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:45880/*"
+  ],
+  "background": {
+    "service_worker": "shihab_background.js"
+  },
+  "action": {
+    "default_popup": "shihab_popup.html",
+    "default_title": "PDF PRO Web Converter (@sshihabb007)"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["mehedi_content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

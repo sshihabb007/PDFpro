@@ -1,0 +1,106 @@
+name: Build & Publish PDF PRO Release (Portable & Setup EXE)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  shihab-build-and-release:
+    name: Build x64 Portable EXE & Setup Installer (Windows)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout PDF PRO Repository
+        uses: actions/checkout@v4
+
+      - name: Compile PDF PRO Portable EXE, Setup Installer & Run Self-Tests
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & .\build.ps1
+          Write-Host "--- Built Release Artifacts in bin/ ---"
+          Get-ChildItem -Path .\bin -File | Select-Object Name, Length
+
+      - name: Verify Silent Setup Installer Execution
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $shihabTestInstallDir = Join-Path $env:RUNNER_TEMP 'ShihabPdfProInstallTest'
+          $mehediSetupProc = Start-Process -FilePath .\bin\PDF-PRO-Setup-14.0.4-x64.exe -ArgumentList @('--silent', "--dir=$shihabTestInstallDir") -Wait -PassThru -NoNewWindow
+          if ($mehediSetupProc.ExitCode -ne 0) {
+            throw "Silent installer verification failed with exit code $($mehediSetupProc.ExitCode)"
+          }
+          if (-not (Test-Path (Join-Path $shihabTestInstallDir 'pdfpro.exe'))) {
+            throw "Installed pdfpro.exe not found in $shihabTestInstallDir"
+          }
+          Write-Host "Silent installer verified successfully at: $shihabTestInstallDir"
+
+      - name: Prepare Release Notes with SHA-256 Checksums
+        shell: powershell
+        run: |
+          $shihabSums = Get-Content -Path .\bin\SHA256SUMS.txt -Raw
+          $mehediNotes = @"
+          ## PDF PRO v14.0.4 (Starship Edition) — Official Windows x64 Release
+          **Author & Architect:** Mehedi Hasan Shihab ([@sshihabb007](https://github.com/sshihabb007))
+
+          ### Direct Downloads
+          | Package | File | Description |
+          | :--- | :--- | :--- |
+          | **Portable EXE (No Install Required)** | `PDF-PRO-Portable-14.0.4-x64.exe` | Single-file standalone x64 portable executable — download and run immediately from anywhere |
+          | **Setup Installer Wizard (EXE)** | `PDF-PRO-Setup-14.0.4-x64.exe` | Full GUI Setup Wizard — installs to `%LOCALAPPDATA%\Programs\PDF PRO`, creates Desktop & Start Menu shortcuts, and supports `--silent` |
+          | **Portable Archive (ZIP)** | `PDF-PRO-Portable-14.0.4-x64.zip` | Complete portable bundle including `pdfpro.exe`, 14 `.fpi` plugin descriptors, assets, and Chromium Web2PDF extension |
+
+          ### Key Capabilities
+          - **Foxit PDF Editor Pro 14 Starship Ribbon UI** with instant **Bright / Dark Theme** toggle (`☀ Bright` / `🌙 Dark`)
+          - **Interactive Text Selection & Smart Markup** (`Select`, `Highlight`, `Underline`, `Strikeout` + floating quick-action toolbar)
+          - **Live In-Place PDF Text Editing** (`Edit Text`, `Add Text`, live inline canvas editor, font/size/color floating format bar, and `Search & Replace`)
+          - **8-Handle Object Editing & Visual Region Cutout** (`Edit Object` to move, resize, clone, delete, or crop any graphic/table/image on a PDF page)
+          - **High-DPI Multi-Page PDF Rendering & Windows 10/11 Neural OCR** (`Windows.Data.Pdf` + `Windows.Media.Ocr`)
+          - **Solid Office Exporter** (`.docx`, `.xlsx`, `.csv`, `.html`, `.md`, `.txt`), **Callas PDF/A-1b Preflight**, **X.509 PKCS#7 Digital Signing**, and **AI Document Assistant**
+
+          ### SHA-256 Checksums
+          ```text
+          $($shihabSums.Trim())
+          ```
+          "@
+          [System.IO.File]::WriteAllText((Join-Path $PWD 'RELEASE_NOTES.md'), $mehediNotes)
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDF-PRO-14.0.4-Windows-x64
+          path: |
+            bin/PDF-PRO-Portable-14.0.4-x64.exe
+            bin/PDF-PRO-Setup-14.0.4-x64.exe
+            bin/PDF-PRO-Portable-14.0.4-x64.zip
+            bin/pdfpro.exe
+            bin/SHA256SUMS.txt
+
+      - name: Publish Portable EXE & Setup EXE to GitHub Releases
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'v14.0.4' }}
+          name: "PDF PRO v14.0.4 — Starship Edition (Portable EXE & Setup Installer)"
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          make_latest: true
+          overwrite_files: true
+          files: |
+            bin/PDF-PRO-Portable-14.0.4-x64.exe
+            bin/PDF-PRO-Setup-14.0.4-x64.exe
+            bin/PDF-PRO-Portable-14.0.4-x64.zip
+            bin/SHA256SUMS.txt
+

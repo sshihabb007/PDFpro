@@ -913,6 +913,18 @@ namespace ShihabMehediPdfPro
                         MehediPdfCoreEngine.PopulateShihabEditableBlocksFromExtractedText(shihabPage);
                     }
                     shihabDoc.ShihabIsModifiedDirty = true;
+                    return shihabOcrText;
+                }
+
+                if (!string.IsNullOrWhiteSpace(shihabPage.ShihabExtractedText))
+                {
+                    if (shihabPage.ShihabTextBlocks == null || shihabPage.ShihabTextBlocks.Count == 0)
+                    {
+                        MehediPdfCoreEngine.PopulateShihabEditableBlocksFromExtractedText(shihabPage);
+                    }
+                    string[] mehediFallbackWords = shihabPage.ShihabExtractedText.Split(new[] { ' ', '\r', '\n', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                    sshihabb007RecognizedWordCount = mehediFallbackWords.Length;
+                    return shihabPage.ShihabExtractedText;
                 }
                 return shihabOcrText;
             }
@@ -942,6 +954,10 @@ namespace ShihabMehediPdfPro
                 mehediFullText = Task.Run(() =>
                 {
                     OcrEngine shihabOcrEngine = OcrEngine.TryCreateFromUserProfileLanguages();
+                    if (shihabOcrEngine == null)
+                    {
+                        try { shihabOcrEngine = OcrEngine.TryCreateFromLanguage(new Windows.Globalization.Language("en-US")); } catch { }
+                    }
                     if (shihabOcrEngine == null) return string.Empty;
 
                     using (InMemoryRandomAccessStream mehediRandomStream = new InMemoryRandomAccessStream())

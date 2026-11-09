@@ -8,12 +8,27 @@
 
 Developed by **[Mehedi Hasan Shihab](https://sshihabb007.github.io/)** (`@sshihabb007`)
 
+[![Build & Release CI/CD](https://github.com/sshihabb007/PDFpro/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/sshihabb007/PDFpro/actions/workflows/build-and-release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/sshihabb007/PDFpro?style=for-the-badge&color=9B2D96&label=Download%20Release)](https://github.com/sshihabb007/PDFpro/releases/latest)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011%20(x64)-06B6D4?style=for-the-badge&logo=windows&logoColor=white)](#)
 [![Architecture](https://img.shields.io/badge/Architecture-Starship%2014.0.4-7C5CFF?style=for-the-badge)](#architecture)
 [![Zero NuGet Bloat](https://img.shields.io/badge/.NET%204.8%20%2B%20WinRT-Zero%20External%20DLLs-10B981?style=for-the-badge)](#build-from-source)
 [![License: MIT](https://img.shields.io/badge/License-MIT-F59E0B?style=for-the-badge)](LICENSE)
 
 </div>
+
+---
+
+## Download Latest Release (Portable EXE & Setup Installer)
+
+Every push and version tag triggers the automated [GitHub Actions CI/CD Release Pipeline](.github/workflows/build-and-release.yml), which compiles, self-tests, and publishes both the **Portable EXE** and **Setup Installer EXE** on the [GitHub Releases Page](https://github.com/sshihabb007/PDFpro/releases/latest):
+
+| Package | Direct Download | Description |
+| :--- | :--- | :--- |
+| **Portable EXE (No Install)** | [`PDF-PRO-Portable-14.0.4-x64.exe`](https://github.com/sshihabb007/PDFpro/releases/latest/download/PDF-PRO-Portable-14.0.4-x64.exe) | Single-file standalone Windows x64 portable executable — run directly from any folder or USB drive |
+| **Setup Installer Wizard (EXE)** | [`PDF-PRO-Setup-14.0.4-x64.exe`](https://github.com/sshihabb007/PDFpro/releases/latest/download/PDF-PRO-Setup-14.0.4-x64.exe) | Full GUI Setup Wizard — installs to `%LOCALAPPDATA%\Programs\PDF PRO`, creates Desktop & Start Menu shortcuts, and supports `--silent` |
+| **Portable Bundle (ZIP)** | [`PDF-PRO-Portable-14.0.4-x64.zip`](https://github.com/sshihabb007/PDFpro/releases/latest/download/PDF-PRO-Portable-14.0.4-x64.zip) | Complete portable archive containing `pdfpro.exe`, 14 `.fpi` plugin descriptors, assets, and Chromium Web2PDF extension |
+| **SHA-256 Checksums** | [`SHA256SUMS.txt`](https://github.com/sshihabb007/PDFpro/releases/latest/download/SHA256SUMS.txt) | Official SHA-256 digests for all release binaries |
 
 ---
 

@@ -132,17 +132,27 @@ $shihabExeHash = (Get-FileHash $shihabOutExe -Algorithm SHA256).Hash.ToLowerInva
 $mehediExeSize = (Get-Item $shihabOutExe).Length
 Write-Output "BUILD SUCCESS [APP]: $shihabOutExe ($mehediExeSize bytes, SHA256=$shihabExeHash)"
 
-# 3. Stage & Package Setup Wizard Payload ZIP
+# 2b. Copy Single-File Standalone Portable Executable (PDF-PRO-Portable-14.0.4-x64.exe)
+$sshihabb007PortableExe = Join-Path $mehediBinDir "PDF-PRO-Portable-$shihabAppVersion-x64.exe"
+Copy-Item -LiteralPath $shihabOutExe -Destination $sshihabb007PortableExe -Force
+$shihabPortableExeHash = (Get-FileHash $sshihabb007PortableExe -Algorithm SHA256).Hash.ToLowerInvariant()
+$mehediPortableExeSize = (Get-Item $sshihabb007PortableExe).Length
+Write-Output "BUILD SUCCESS [PORTABLE EXE]: $sshihabb007PortableExe ($mehediPortableExeSize bytes, SHA256=$shihabPortableExeHash)"
+
+# 3. Stage & Package Setup Wizard Payload ZIP + Portable Bundle ZIP
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $sshihabb007StageDir = Join-Path $shihabObjDir 'installer_stage'
 $shihabPayloadZip = Join-Path $shihabObjDir 'shihab_pdfpro_payload.zip'
+$mehediPortableZip = Join-Path $mehediBinDir "PDF-PRO-Portable-$shihabAppVersion-x64.zip"
 if (Test-Path $sshihabb007StageDir) { Remove-Item -LiteralPath $sshihabb007StageDir -Recurse -Force }
 if (Test-Path $shihabPayloadZip) { Remove-Item -LiteralPath $shihabPayloadZip -Force }
+if (Test-Path $mehediPortableZip) { Remove-Item -LiteralPath $mehediPortableZip -Force }
 
 New-Item -ItemType Directory -Force -Path $sshihabb007StageDir | Out-Null
 Copy-Item -LiteralPath $shihabOutExe -Destination (Join-Path $sshihabb007StageDir 'pdfpro.exe') -Force
+Copy-Item -LiteralPath $sshihabb007PortableExe -Destination (Join-Path $sshihabb007StageDir "PDF-PRO-Portable-$shihabAppVersion-x64.exe") -Force
 Copy-Item -Path (Join-Path $shihabProjectRoot 'plugins') -Destination (Join-Path $sshihabb007StageDir 'plugins') -Recurse -Force
 Copy-Item -Path $mehediAssetsDir -Destination (Join-Path $sshihabb007StageDir 'assets') -Recurse -Force
 Copy-Item -Path (Join-Path $shihabProjectRoot 'extension') -Destination (Join-Path $sshihabb007StageDir 'extension') -Recurse -Force
@@ -154,7 +164,12 @@ Copy-Item -LiteralPath (Join-Path $shihabProjectRoot 'LICENSE') -Destination (Jo
     $shihabPayloadZip,
     [System.IO.Compression.CompressionLevel]::Optimal,
     $false)
+Copy-Item -LiteralPath $shihabPayloadZip -Destination $mehediPortableZip -Force
 Remove-Item -LiteralPath $sshihabb007StageDir -Recurse -Force -ErrorAction SilentlyContinue
+
+$sshihabb007PortableZipHash = (Get-FileHash $mehediPortableZip -Algorithm SHA256).Hash.ToLowerInvariant()
+$shihabPortableZipSize = (Get-Item $mehediPortableZip).Length
+Write-Output "BUILD SUCCESS [PORTABLE ZIP]: $mehediPortableZip ($shihabPortableZipSize bytes, SHA256=$sshihabb007PortableZipHash)"
 
 # 4. Compile x64 Setup Wizard (PDF-PRO-Setup-14.0.4-x64.exe)
 $mehediSetupExe = Join-Path $mehediBinDir "PDF-PRO-Setup-$shihabAppVersion-x64.exe"
@@ -179,6 +194,17 @@ if ($LASTEXITCODE -ne 0) {
 $sshihabb007SetupHash = (Get-FileHash $mehediSetupExe -Algorithm SHA256).Hash.ToLowerInvariant()
 $shihabSetupSize = (Get-Item $mehediSetupExe).Length
 Write-Output "BUILD SUCCESS [INSTALLER]: $mehediSetupExe ($shihabSetupSize bytes, SHA256=$sshihabb007SetupHash)"
+
+# 4b. Write SHA256SUMS.txt for GitHub Releases
+$mehediSha256SumsPath = Join-Path $mehediBinDir 'SHA256SUMS.txt'
+$sshihabb007ShaLines = @(
+    "$shihabPortableExeHash  PDF-PRO-Portable-$shihabAppVersion-x64.exe",
+    "$sshihabb007SetupHash  PDF-PRO-Setup-$shihabAppVersion-x64.exe",
+    "$sshihabb007PortableZipHash  PDF-PRO-Portable-$shihabAppVersion-x64.zip",
+    "$shihabExeHash  pdfpro.exe"
+)
+[System.IO.File]::WriteAllLines($mehediSha256SumsPath, $sshihabb007ShaLines)
+Write-Output "BUILD SUCCESS [SHA256SUMS]: $mehediSha256SumsPath"
 
 # 5. Execute Automated End-to-End Self-Test Suite Synchronously
 $mehediSamplesDir = Join-Path $mehediBinDir 'samples'

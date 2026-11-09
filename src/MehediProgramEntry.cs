@@ -160,7 +160,8 @@ namespace ShihabMehediPdfPro
             {
                 @"C:\Users\MEHEDI\Downloads\Chrome\Google for Education Level 2 — Easy Step-by-Step Guide.pdf",
                 @"C:\Users\MEHEDI\Downloads\Chrome\19 SmartGuard BD(final).pdf",
-                @"C:\Users\MEHEDI\Downloads\Chrome\Annual_Campaign_Initiative_Roadmap.pdf"
+                @"C:\Users\MEHEDI\Downloads\Chrome\Annual_Campaign_Initiative_Roadmap.pdf",
+                mehediShowcasePdfPath
             };
             foreach (string shihabRealSample in sshihabb007RealSamples)
             {
